@@ -24,9 +24,9 @@ public class PkiExpressException extends RuntimeException {
         this.details = details;
     }
 
-    private PkiExpressException(String message, Throwable cause) {
+    private PkiExpressException(String message, @Nullable String details, Throwable cause) {
         super(message, cause);
-        this.details = null;
+        this.details = details;
     }
 
     public @Nullable String details() {
@@ -34,16 +34,35 @@ public class PkiExpressException extends RuntimeException {
     }
 
     /**
-     * PKI Express reports failures as its console output, .NET stack trace included; keep only the explanation.
+     * PKI Express reports failures as its console output, .NET exceptions and stack traces included.
      */
     static PkiExpressException from(RuntimeException e) {
         if (e instanceof PkiExpressException pkiExpressException) {
             return pkiExpressException;
         }
-        var message = e.getMessage() == null ? "" : e.getMessage().lines()
-                .filter(line -> !line.stripLeading().startsWith("at "))
+        var output = withoutStackTraces(e.getMessage());
+        if (output.isEmpty()) {
+            return new PkiExpressException("Falha inesperada no PKI Express.", null, e);
+        }
+        // PKI Express fails with this .NET exception on a file it cannot parse as a PDF.
+        if (output.contains("InvalidPdfException")) {
+            return new PkiExpressException("O arquivo não é um PDF válido ou está corrompido.", output, e);
+        }
+        return new PkiExpressException(output, null, e);
+    }
+
+    private static String withoutStackTraces(@Nullable String output) {
+        if (output == null) {
+            return "";
+        }
+        return output.lines()
+                .filter(line -> {
+                    var content = line.strip();
+                    return !content.startsWith("at ")
+                            && !content.startsWith("--->")
+                            && !content.startsWith("--- End of inner exception");
+                })
                 .collect(Collectors.joining("\n"))
                 .strip();
-        return new PkiExpressException(message.isEmpty() ? "Falha inesperada no PKI Express." : message, e);
     }
 }
