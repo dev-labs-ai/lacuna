@@ -5,7 +5,6 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -24,10 +23,9 @@ class DocumentRepository {
     }
 
     void insert(StoredDocument document) {
-        var signedAt = document.signedAt() != null ? document.signedAt().atOffset(ZoneOffset.UTC) : null;
         jdbc.sql("""
-                        INSERT INTO document (id, bucket, object_key, file_name, size_bytes, mime_type, signed_at)
-                        VALUES (:id, :bucket, :objectKey, :fileName, :sizeBytes, :mimeType, :signedAt)
+                        INSERT INTO document (id, bucket, object_key, file_name, size_bytes, mime_type, sha256, stored_at)
+                        VALUES (:id, :bucket, :objectKey, :fileName, :sizeBytes, :mimeType, :sha256, :storedAt)
                         """)
                 .param("id", document.id())
                 .param("bucket", document.bucket())
@@ -35,13 +33,14 @@ class DocumentRepository {
                 .param("fileName", document.name())
                 .param("sizeBytes", document.sizeBytes())
                 .param("mimeType", document.mimeType())
-                .param("signedAt", signedAt, Types.TIMESTAMP_WITH_TIMEZONE)
+                .param("sha256", document.sha256())
+                .param("storedAt", document.storedAt().atOffset(ZoneOffset.UTC))
                 .update();
     }
 
     Optional<StoredDocument> find(UUID id) {
         return jdbc.sql("""
-                        SELECT id, bucket, object_key, file_name, size_bytes, mime_type, signed_at
+                        SELECT id, bucket, object_key, file_name, size_bytes, mime_type, sha256, stored_at
                         FROM document
                         WHERE id = :id
                         """)
@@ -51,7 +50,6 @@ class DocumentRepository {
     }
 
     private static StoredDocument toDocument(ResultSet row, int rowNumber) throws SQLException {
-        var signedAt = row.getObject("signed_at", OffsetDateTime.class);
         return new StoredDocument(
                 row.getObject("id", UUID.class),
                 row.getString("file_name"),
@@ -59,6 +57,7 @@ class DocumentRepository {
                 row.getString("bucket"),
                 row.getString("object_key"),
                 row.getLong("size_bytes"),
-                signedAt != null ? signedAt.toInstant() : null);
+                row.getString("sha256"),
+                row.getObject("stored_at", OffsetDateTime.class).toInstant());
     }
 }

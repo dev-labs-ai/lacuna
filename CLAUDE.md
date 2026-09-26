@@ -73,10 +73,14 @@ Packages under `com.lacuna`:
   `yyyy/MM/dd/<id>.<extension>` (UTC storage date) plus a row in the `document` table (`DocumentRepository`,
   `JdbcClient`; schema in Flyway's `db/migration`). Ids are UUID v7 from `UuidV7`, generated before the object is
   written since its key contains them (Java 25 has no v7; Java 26's `UUID.ofEpochMillis` can replace it). The object
-  is written first and deleted if the insert fails. PKI Express needs local files: `copyToWorkFolder` / `newWorkFile`
-  return a `WorkFile` in `<storage>/work`, deleted on close, so use try-with-resources. `signed_at` is read back from
-  the signed file (newest signer's time), not the completion time. `DocumentFormat` tells PDF / CMS / other apart
-  from the content bytes, never from the file name, and maps each to its MIME type (stored) and extension.
+  is written first, with its SHA-256 (checked by the server) and `x-amz-meta-*` naming the document, and deleted if the
+  insert fails. `storeSigned` takes a callback that runs in the transaction inserting the document's row:
+  `SignatureService` records the `signature` row there (`StoredSignature`, `SignatureRepository`), linking the source
+  document to the signed one, with the signer's certificate data. PKI Express needs local files: `copyToWorkFolder` /
+  `newWorkFile` return a `WorkFile` in `<storage>/work`, deleted on close, so use try-with-resources. `signed_at` is
+  read back from the signed file (newest signer's time), not the completion time. `DocumentFormat` tells PDF / CMS /
+  other apart from the content bytes, never from the file name, and maps each to its MIME type (stored) and
+  extension.
   `SignatureFormat` holds the rules: PDFs take PAdES or CAdES, anything else CAdES, and an existing `.p7s` is co-signed.
 - `web.GlobalExceptionHandler` — HTML error page; picks the "back" link from the request path.
 
@@ -130,6 +134,7 @@ Commits follow Conventional Commits in English (scopes in use: `signature`, `val
 commit, each commit passing the tests on its own.
 
 Flyway migrations are named `V<yyyyMMddHHmmss>__<description>.sql`, the timestamp in UTC (`date -u +%Y%m%d%H%M%S`)
-and the description in English snake_case starting with a verb (`V20260926175716__create_document.sql`). Never
-rename or edit an applied one. `spring.flyway.out-of-order` is on, so a migration from a parallel branch with an
-older timestamp still runs: migrations must not depend on others written at the same time.
+and the description in English snake_case starting with a verb
+(`V20260926184059__create_document_and_signature.sql`). Never rename or edit an applied one.
+`spring.flyway.out-of-order` is on, so a migration from a parallel branch with an older timestamp still runs:
+migrations must not depend on others written at the same time.

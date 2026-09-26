@@ -104,10 +104,13 @@ para e mostra a mensagem do PKI Express (`docker compose logs app`).
 
 ## Armazenamento
 
-Cada documento, enviado ou assinado, é um objeto no bucket (`lacuna.storage.bucket`) e uma linha na tabela
-`document` do PostgreSQL. As migrações do Flyway ficam em `src/main/resources/db/migration`, com o nome
+Cada arquivo, o original enviado ou um assinado, é um objeto no bucket (`lacuna.storage.bucket`) e uma linha na
+tabela `document` do PostgreSQL; cada assinatura é uma linha na tabela `signature`, que liga o arquivo assinado ao
+arquivo que ela produziu. As migrações do Flyway ficam em `src/main/resources/db/migration`, com o nome
 `V<AAAAMMDDhhmmss>__<descrição>.sql` (horário UTC, gerado com `date -u +%Y%m%d%H%M%S`), e rodam mesmo fora de ordem
-(`spring.flyway.out-of-order`), para aceitar migrações de branches paralelos:
+(`spring.flyway.out-of-order`), para aceitar migrações de branches paralelos.
+
+`document`, um por arquivo:
 
 | Coluna | |
 |---|---|
@@ -115,7 +118,26 @@ Cada documento, enviado ou assinado, é um objeto no bucket (`lacuna.storage.buc
 | `bucket`, `object_key` | Onde está o objeto: `AAAA/MM/DD/<id>.<extensão>`, com a data (UTC) em que foi guardado, por exemplo `2026/09/26/01a0dec1-1590-7bd0-ab56-8d349e958db8.pdf` |
 | `file_name` | Nome original, usado na tela e nos downloads |
 | `size_bytes`, `mime_type` | Tamanho e tipo: `application/pdf`, `application/pkcs7-signature` (`.p7s`) ou `application/octet-stream` |
-| `signed_at` | Data e hora (UTC) da assinatura que gerou o arquivo, lida do próprio arquivo assinado; vazia nos arquivos enviados |
+| `sha256` | Hash do conteúdo em hexadecimal, que o servidor S3 também confere ao receber o objeto |
+| `stored_at` | Quando foi guardado (UTC); o mesmo instante do UUID |
+
+`signature`, uma por assinatura feita:
+
+| Coluna | |
+|---|---|
+| `id` | UUID versão 7 |
+| `source_document_id` | O arquivo que foi assinado: o original enviado, ou um arquivo já assinado, numa coassinatura |
+| `signed_document_id` | O arquivo que a assinatura produziu |
+| `format`, `policy` | `PADES` ou `CADES`, e a política do PKI Express (por exemplo `PadesBasicWithLTV`) |
+| `signed_at` | Data e hora (UTC) gravada na própria assinatura, a mesma do carimbo do PDF |
+| `signer_name`, `signer_email`, `signer_cpf`, `signer_cnpj` | Do certificado do signatário; CPF e CNPJ (ICP-Brasil) só com dígitos |
+| `certificate_issuer`, `certificate_serial_number`, `certificate_thumbprint`, `certificate_not_before`, `certificate_not_after` | Emissor, número de série e SHA-256 do certificado (hexadecimal) e sua validade |
+
+Uma coassinatura parte de um arquivo já assinado, então a cadeia de `source_document_id` leva de volta ao arquivo
+enviado. Cada objeto também leva metadados que o descrevem sem o banco: `x-amz-meta-document-id`,
+`x-amz-meta-file-name` (codificado em UTF-8 com `%`, pois metadados S3 só aceitam ASCII) e, nos assinados,
+`x-amz-meta-source-document-id`. A linha do arquivo assinado e a da assinatura entram na mesma transação: se uma
+falhar, nenhuma fica, e o objeto é apagado.
 
 O UUID versão 7 começa pelo instante de criação em milissegundos e termina com 74 bits aleatórios: os ids crescem com
 o tempo, então entram no fim do índice da chave primária (o v4, aleatório, espalha as inserções pelo índice) e a
@@ -132,6 +154,7 @@ PKI Express trabalha e a apaga em seguida.
 | `SignatureApiController` | Versão JSON do fluxo de assinatura, usada pela assinatura em lote |
 | `ValidationService` | Validação de PDFs e `.p7s` e extração do arquivo contido num `.p7s` |
 | `DocumentStorage` | Documentos no S3 com seus dados na tabela `document` (via `DocumentRepository`) |
+| `SignatureRepository` | As assinaturas feitas, na tabela `signature` |
 
 ## Configuração
 

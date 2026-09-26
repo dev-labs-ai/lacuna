@@ -44,13 +44,17 @@ public class SignatureService {
     private final PkiExpressOperators pkiExpress;
     private final CertificateValidator certificates;
     private final DocumentStorage storage;
+    private final SignatureRepository repository;
+    private final LacunaProperties.PkiExpress settings;
     private final boolean validateCertificateOnSelection;
 
-    public SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates, DocumentStorage storage,
-                            LacunaProperties properties) {
+    SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates, DocumentStorage storage,
+                     SignatureRepository repository, LacunaProperties properties) {
         this.pkiExpress = pkiExpress;
         this.certificates = certificates;
         this.storage = storage;
+        this.repository = repository;
+        this.settings = properties.pkiExpress();
         this.validateCertificateOnSelection = properties.signature().validateCertificateOnSelection();
     }
 
@@ -81,15 +85,18 @@ public class SignatureService {
     }
 
     /**
-     * Completes the signature of a stored document, storing the signed file as a new document.
+     * Completes the signature of a stored document, storing the signed file as a new document and recording the
+     * signature: which document was signed, the one it produced, and the signer.
      */
     public SignedDocument complete(StoredDocument document, String transferFileId, String signature,
                                    String certificateBase64) throws IOException {
         try (var file = storage.copyToWorkFolder(document); var output = storage.newWorkFile()) {
             var signer = complete(file.path(), transferFileId, signature, certificateBase64, output.path());
-            var format = DocumentFormat.detect(output.path());
-            var signed = storage.storeSigned(output.path(), document.signedName(format),
-                    signingTime(output.path(), format));
+            var signedFormat = DocumentFormat.detect(output.path());
+            var format = SignatureFormat.producing(signedFormat);
+            var signedAt = signingTime(output.path(), signedFormat);
+            var signed = storage.storeSigned(output.path(), document.signedName(signedFormat), document, stored ->
+                    repository.insert(StoredSignature.of(document, stored, format, policy(format), signedAt, signer)));
             return new SignedDocument(signed, signer.getSubjectName().getCommonName());
         }
     }
@@ -191,6 +198,14 @@ public class SignatureService {
                 .max(Comparator.naturalOrder())
                 // A signature policy may leave the signing time out; the completion time is then the closest.
                 .orElseGet(Instant::now);
+    }
+
+    // The policy PkiExpressOperators gives the starter of this format.
+    private String policy(SignatureFormat format) {
+        return switch (format) {
+            case PADES -> settings.padesPolicy().name();
+            case CADES -> settings.cadesPolicy().name();
+        };
     }
 
     private static SignatureStart toSignatureStart(SignatureStartResult result) {

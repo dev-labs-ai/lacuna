@@ -13,15 +13,23 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ChecksumMode;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,7 +71,7 @@ class DocumentStorageTest {
         assertThat(found.name()).isEqualTo("contrato.pdf");
         assertThat(found.format()).isEqualTo(DocumentFormat.PDF);
         assertThat(found.sizeBytes()).isEqualTo(PDF.length);
-        assertThat(found.signedAt()).isNull();
+        assertThat(found.sha256()).isEqualTo(sha256Hex(PDF));
         try (var content = storage.openContent(found)) {
             assertThat(content.readAllBytes()).isEqualTo(PDF);
         }
@@ -93,21 +101,63 @@ class DocumentStorageTest {
 
     @Test
     void recordsWhatIsKnownAboutTheFile() throws Exception {
-        var signedAt = Instant.parse("2026-09-26T16:40:45Z");
-        var file = Files.write(storageDir.resolve("assinado.pdf"), PDF);
-
-        var stored = storage.storeSigned(file, "contrato.pdf", signedAt);
+        var stored = storage.store("contrato.pdf", new ByteArrayInputStream(PDF));
 
         var row = jdbc.sql("SELECT * FROM document WHERE id = :id").param("id", stored.id()).query().singleRow();
         assertThat(row).containsEntry("bucket", "documents")
                 .containsEntry("object_key", stored.objectKey())
                 .containsEntry("file_name", "contrato.pdf")
                 .containsEntry("size_bytes", (long) PDF.length)
-                .containsEntry("mime_type", "application/pdf");
-        assertThat(jdbc.sql("SELECT signed_at AT TIME ZONE 'UTC' FROM document WHERE id = :id")
-                .param("id", stored.id()).query(String.class).single()).isEqualTo("2026-09-26 16:40:45");
-        assertThat(storage.find(stored.id().toString()).signedAt()).isEqualTo(signedAt);
+                .containsEntry("mime_type", "application/pdf")
+                .containsEntry("sha256", sha256Hex(PDF));
+        assertThat(((Timestamp) row.get("stored_at")).toInstant())
+                .isEqualTo(stored.storedAt())
+                .isEqualTo(Instant.ofEpochMilli(stored.id().getMostSignificantBits() >>> 16));
+    }
+
+    @Test
+    void describesTheObjectInItsMetadata() throws Exception {
+        var stored = storage.store("relatório final.pdf", new ByteArrayInputStream(PDF));
+
+        var object = s3.headObject(request -> request.bucket("documents").key(stored.objectKey())
+                .checksumMode(ChecksumMode.ENABLED));
+        assertThat(object.checksumSHA256()).isEqualTo(Base64.getEncoder().encodeToString(sha256(PDF)));
+        assertThat(object.metadata()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "document-id", stored.id().toString(),
+                "file-name", "relat%C3%B3rio%20final.pdf"));
+    }
+
+    @Test
+    void linksSignedFilesToTheirSource() throws Exception {
+        var source = storage.store("contrato.pdf", new ByteArrayInputStream(PDF));
+        var file = Files.write(storageDir.resolve("assinado.pdf"), PDF);
+        var recorded = new ArrayList<StoredDocument>();
+
+        var signed = storage.storeSigned(file, "contrato.pdf", source, recorded::add);
+
+        assertThat(recorded).containsExactly(signed);
+        assertThat(s3.headObject(request -> request.bucket("documents").key(signed.objectKey())).metadata())
+                .containsEntry("source-document-id", source.id().toString());
         assertThat(file).exists();
+    }
+
+    @Test
+    void recordsNeitherTheDocumentNorItsSignatureWhenOneFails() throws Exception {
+        var source = storage.store("contrato.pdf", new ByteArrayInputStream(PDF));
+        var file = Files.write(storageDir.resolve("assinado.pdf"), PDF);
+        var attempted = new ArrayList<StoredDocument>();
+
+        assertThatThrownBy(() -> storage.storeSigned(file, "contrato.pdf", source, signed -> {
+            attempted.add(signed);
+            jdbc.sql("UPDATE document SET file_name = 'alterado.pdf' WHERE id = :id").param("id", source.id()).update();
+            throw new IllegalStateException("falha ao registrar a assinatura");
+        })).hasMessage("falha ao registrar a assinatura");
+
+        var signed = attempted.getFirst();
+        assertThatThrownBy(() -> storage.find(signed.id().toString())).isInstanceOf(DocumentNotFoundException.class);
+        assertThat(storage.find(source.id().toString()).name()).isEqualTo("contrato.pdf");
+        assertThatThrownBy(() -> s3.headObject(request -> request.bucket("documents").key(signed.objectKey())))
+                .isInstanceOf(NoSuchKeyException.class);
     }
 
     @Test
@@ -178,6 +228,14 @@ class DocumentStorageTest {
         var name = "a".repeat(300) + ".pdf";
 
         assertThat(DocumentStorage.sanitize(name)).hasSize(200).endsWith(".pdf");
+    }
+
+    private static byte[] sha256(byte[] content) throws Exception {
+        return MessageDigest.getInstance("SHA-256").digest(content);
+    }
+
+    private static String sha256Hex(byte[] content) throws Exception {
+        return HexFormat.of().formatHex(sha256(content));
     }
 
     private long countDocuments() {

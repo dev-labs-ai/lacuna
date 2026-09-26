@@ -1,7 +1,5 @@
 package com.lacuna.document;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
@@ -12,10 +10,11 @@ import java.util.UUID;
  * @param id        UUID version 7, which also names the object
  * @param name      original file name, only used for display and downloads
  * @param objectKey where the object is in the bucket: {@code yyyy/MM/dd/<id>.<extension>}, dated when stored (UTC)
- * @param signedAt  when the signature that produced this file was made; null for a file uploaded to be signed
+ * @param sha256    of the content, in lowercase hex
+ * @param storedAt  also the timestamp in the id
  */
 public record StoredDocument(UUID id, String name, DocumentFormat format, String bucket, String objectKey,
-                             long sizeBytes, @Nullable Instant signedAt) {
+                             long sizeBytes, String sha256, Instant storedAt) {
 
     public String mimeType() {
         return format.mimeType();

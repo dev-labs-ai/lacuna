@@ -36,4 +36,15 @@ public enum SignatureFormat {
     public static List<SignatureFormat> availableFor(DocumentFormat documentFormat) {
         return Arrays.stream(values()).filter(format -> format.supports(documentFormat)).toList();
     }
+
+    /**
+     * The format of a signature from the file it produced: PAdES writes a PDF, CAdES a .p7s.
+     */
+    public static SignatureFormat producing(DocumentFormat signedFormat) {
+        return switch (signedFormat) {
+            case PDF -> PADES;
+            case CMS -> CADES;
+            case OTHER -> throw new IllegalArgumentException("A signature produces a PDF or a .p7s, not " + signedFormat);
+        };
+    }
 }
