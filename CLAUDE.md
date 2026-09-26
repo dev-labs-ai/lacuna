@@ -128,3 +128,8 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
 
 Commits follow Conventional Commits in English (scopes in use: `signature`, `validation`), one logical change per
 commit, each commit passing the tests on its own.
+
+Flyway migrations are named `V<yyyyMMddHHmmss>__<description>.sql`, the timestamp in UTC (`date -u +%Y%m%d%H%M%S`)
+and the description in English snake_case starting with a verb (`V20260926175716__create_document.sql`). Never
+rename or edit an applied one. `spring.flyway.out-of-order` is on, so a migration from a parallel branch with an
+older timestamp still runs: migrations must not depend on others written at the same time.

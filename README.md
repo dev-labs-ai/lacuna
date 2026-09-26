@@ -105,7 +105,9 @@ para e mostra a mensagem do PKI Express (`docker compose logs app`).
 ## Armazenamento
 
 Cada documento, enviado ou assinado, é um objeto no bucket (`lacuna.storage.bucket`) e uma linha na tabela
-`document` do PostgreSQL (migrações do Flyway em `src/main/resources/db/migration`):
+`document` do PostgreSQL. As migrações do Flyway ficam em `src/main/resources/db/migration`, com o nome
+`V<AAAAMMDDhhmmss>__<descrição>.sql` (horário UTC, gerado com `date -u +%Y%m%d%H%M%S`), e rodam mesmo fora de ordem
+(`spring.flyway.out-of-order`), para aceitar migrações de branches paralelos:
 
 | Coluna | |
 |---|---|
