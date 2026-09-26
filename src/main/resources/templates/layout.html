@@ -14,6 +14,10 @@
     <div class="container">
         <a class="brand" th:href="@{/}">Assinador Digital</a>
         <span class="tagline">PAdES e CAdES com Lacuna PKI Express + Web PKI</span>
+        <nav class="site-nav" aria-label="Principal">
+            <a th:href="@{/}">Assinar</a>
+            <a th:href="@{/validate}">Validar</a>
+        </nav>
     </div>
 </header>
 <main th:replace="${pageMain}"></main>

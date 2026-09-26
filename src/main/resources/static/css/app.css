@@ -135,6 +135,21 @@ main.container {
     font-size: 0.9375rem;
 }
 
+.site-nav {
+    display: flex;
+    gap: 1rem;
+    margin-inline-start: auto;
+}
+
+.site-nav a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.site-nav a:hover {
+    text-decoration: underline;
+}
+
 .file-name {
     overflow-wrap: anywhere;
 }
@@ -367,6 +382,14 @@ pre {
 }
 
 .badge.invalid {
+    color: var(--error);
+}
+
+.summary-valid {
+    color: var(--ok);
+}
+
+.summary-invalid {
     color: var(--error);
 }
 

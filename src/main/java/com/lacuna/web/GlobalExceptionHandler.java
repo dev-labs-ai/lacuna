@@ -67,6 +67,9 @@ public class GlobalExceptionHandler {
         if (signature.matches()) {
             return new Back("/documents/" + signature.group(1) + "/sign", "Tentar novamente");
         }
+        if (path.startsWith("/validate")) {
+            return new Back("/validate", "Validar outro arquivo");
+        }
         return new Back("/", "Voltar ao início");
     }
 

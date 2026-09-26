@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{})}">
+<head>
+    <title>Validar assinaturas · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack">
+    <div>
+        <h1>Validar assinaturas</h1>
+        <p class="lead">
+            Verifique assinaturas PAdES (PDF) e CAdES (.p7s): quem assinou, quando, e se as assinaturas e os
+            certificados são válidos. Os arquivos são descartados após a validação.
+        </p>
+    </div>
+
+    <form class="card stack" th:action="@{/validate}" method="post" enctype="multipart/form-data" data-busy-on-submit>
+        <div class="field">
+            <label for="signedFile">Arquivo assinado <span class="required" aria-hidden="true">*</span></label>
+            <input type="file" id="signedFile" name="signedFile" required aria-describedby="signedFile-hint">
+            <p id="signedFile-hint" class="hint">PDF assinado ou assinatura CAdES (.p7s).</p>
+        </div>
+        <div class="field">
+            <label for="originalFile">Arquivo original (opcional)</label>
+            <input type="file" id="originalFile" name="originalFile" aria-describedby="originalFile-hint">
+            <p id="originalFile-hint" class="hint">
+                Necessário apenas para assinaturas CAdES destacadas, cujo .p7s não contém o arquivo assinado.
+            </p>
+        </div>
+        <div class="actions">
+            <button type="submit" class="button primary">Validar</button>
+        </div>
+    </form>
+
+    <div th:if="${error}" class="notice warning" role="alert">
+        <p><strong>Não foi possível validar o arquivo.</strong></p>
+        <p th:text="${error}">motivo</p>
+    </div>
+
+    <section th:if="${report}" class="stack" aria-labelledby="result-title">
+        <div>
+            <h2 id="result-title" th:text="|Resultado: ${fileName}|">Resultado</h2>
+            <p>
+                <span th:text="|Formato ${report.format.label()}.|">Formato</span>
+                <th:block th:unless="${report.signers.empty}">
+                    <strong th:if="${report.invalidCount() == 0}" class="summary-valid"
+                            th:text="${report.signers.size() == 1} ? 'A assinatura é válida.'
+                                     : |Todas as ${report.signers.size()} assinaturas são válidas.|">Todas válidas.</strong>
+                    <strong th:unless="${report.invalidCount() == 0}" class="summary-invalid"
+                            th:text="${report.signers.size() == 1} ? 'A assinatura tem problemas.'
+                                     : |${report.invalidCount()} de ${report.signers.size()} assinaturas com problemas.|">
+                        Com problemas.</strong>
+                </th:block>
+            </p>
+        </div>
+        <th:block th:replace="~{fragments :: signers(${report})}"></th:block>
+    </section>
+</main>
+</body>
+</html>
