@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -101,7 +102,7 @@ public class ValidationService {
                 certificate.getEmailAddress(),
                 pkiBrazil != null ? pkiBrazil.getCpfFormatted() : "",
                 certificate.getIssuerName().getCommonName(),
-                signer.getSigningTime() != null ? signer.getSigningTime().toInstant().atZone(pkiExpress.zone()) : null,
+                signer.getSigningTime() != null ? signer.getSigningTime().toInstant().atOffset(ZoneOffset.UTC) : null,
                 signer instanceof PadesSignerInfo pades && pades.getIsDocumentTimestamp(),
                 validation != null && validation.isValid(),
                 validation != null ? messages(validation.getErrors()) : List.of(),

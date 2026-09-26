@@ -20,11 +20,16 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -80,9 +85,17 @@ class SignatureFlowTest {
         assertThat(report.signers()).singleElement().satisfies(signature -> {
             assertThat(signature.name()).isEqualTo(TestSigner.NAME);
             assertThat(signature.valid()).as(signature.report()).isTrue();
-            assertThat(signature.signingTime()).isNotNull();
+            assertThat(signature.signingTime().getOffset()).isEqualTo(ZoneOffset.UTC);
+            assertThat(signature.signingTime())
+                    .isCloseTo(OffsetDateTime.now(ZoneOffset.UTC), within(1, ChronoUnit.MINUTES));
         });
         assertThat(storageDir.resolve("pkie-transfer").resolve(start.transferFileId())).doesNotExist();
+
+        // In UTC, for app.js to show in the reader's time zone.
+        var signingTime = report.signers().getFirst().signingTime();
+        mvc.perform(get(signed))
+                .andExpect(content().string(containsString("<time data-local-time datetime=\"" + signingTime + "\">"
+                        + DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").format(signingTime) + " UTC</time>")));
     }
 
     @Test

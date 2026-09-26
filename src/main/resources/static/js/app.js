@@ -22,3 +22,18 @@ window.addEventListener('pageshow', (event) => {
         }
     }
 });
+
+// Times marked with data-local-time come in UTC; show them in the reader's time zone, e.g. "26/09/2026 12:40:45
+// GMT-04:00", keeping the UTC time as a tooltip.
+const localTime = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    timeZoneName: 'longOffset',
+});
+for (const time of document.querySelectorAll('time[data-local-time]')) {
+    const parts = Object.fromEntries(
+        localTime.formatToParts(new Date(time.dateTime)).map((part) => [part.type, part.value]));
+    time.title = time.textContent;
+    time.textContent = `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}:${parts.second} `
+        + parts.timeZoneName;
+}

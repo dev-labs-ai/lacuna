@@ -35,7 +35,9 @@
                 <dd th:text="${signer.issuer}">AC</dd>
                 <th:block th:if="${signer.signingTime}">
                     <dt>Data da assinatura</dt>
-                    <dd th:text="${#temporals.format(signer.signingTime, 'dd/MM/yyyy HH:mm:ss xxx')}">data</dd>
+                    <!-- In UTC; app.js shows it in the reader's time zone. -->
+                    <dd><time data-local-time th:datetime="${signer.signingTime}"
+                              th:text="${#temporals.format(signer.signingTime, 'dd/MM/yyyy HH:mm:ss')} + ' UTC'">data</time></dd>
                 </th:block>
             </dl>
 

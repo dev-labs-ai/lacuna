@@ -118,7 +118,8 @@ para e mostra a mensagem do PKI Express (`docker compose logs app`).
 | `lacuna.web-pki.license` | — | Licença do Web PKI (Base64 ou JSON), necessária fora de `localhost` |
 | `lacuna.storage.dir` | `<java.io.tmpdir>/lacuna` | Documentos e arquivos de trabalho do PKI Express |
 
-As políticas padrão são as mesmas do PKI Express.
+As políticas padrão são as mesmas do PKI Express. A página do documento mostra a data da assinatura no fuso do
+navegador.
 
 ## Testes
 
