@@ -1,6 +1,10 @@
 package com.lacuna.signature;
 
 import com.lacuna.config.LacunaProperties;
+import com.lacuna.document.DocumentFormat;
+import com.lacuna.document.DocumentStorage;
+import com.lacuna.document.InvalidDocumentException;
+import com.lacuna.document.StoredDocument;
 import com.lacuna.pkiexpress.PkiExpressException;
 import com.lacuna.pkiexpress.PkiExpressOperators;
 import com.lacunasoftware.pkiexpress.PKCertificate;
@@ -33,23 +37,56 @@ public class SignatureService {
 
     private final PkiExpressOperators pkiExpress;
     private final CertificateValidator certificates;
+    private final DocumentStorage storage;
     private final boolean validateCertificateOnSelection;
 
-    public SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates, LacunaProperties properties) {
+    public SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates, DocumentStorage storage,
+                            LacunaProperties properties) {
         this.pkiExpress = pkiExpress;
         this.certificates = certificates;
+        this.storage = storage;
         this.validateCertificateOnSelection = properties.signature().validateCertificateOnSelection();
     }
 
     /**
-     * @param certificateBase64 the signer's certificate (DER, Base64), as read by Web PKI
-     * @throws CertificateRejectedException if validation on selection is enabled and the certificate is not accepted
+     * Validates the certificate the user chose, before asking them to sign, unless
+     * {@code lacuna.signature.validate-certificate-on-selection} is off. PKI Express only validates it on completion,
+     * after the user has signed (and maybe typed a PIN) for nothing.
+     *
+     * @throws CertificateRejectedException if the certificate is not accepted
      */
-    public SignatureStart start(Path file, SignatureFormat format, String certificateBase64) throws IOException {
-        // PKI Express only validates the certificate on completion, after the user has signed (and typed a PIN).
+    public void checkCertificate(String certificateBase64) throws IOException {
         if (validateCertificateOnSelection) {
             certificates.requireValid(certificateBase64);
         }
+    }
+
+    /**
+     * @throws InvalidDocumentException if the document cannot be signed in this format
+     */
+    public SignatureStart start(StoredDocument document, SignatureFormat format, String certificateBase64)
+            throws IOException {
+        if (!format.supports(document.format())) {
+            throw new InvalidDocumentException("Somente arquivos PDF podem receber assinaturas PAdES.");
+        }
+        return start(document.path(), format, certificateBase64);
+    }
+
+    /**
+     * Completes the signature of a stored document, storing the signed file as a new document.
+     */
+    public SignedDocument complete(StoredDocument document, String transferFileId, String signature,
+                                   String certificateBase64) throws IOException {
+        var output = storage.reserve();
+        var signer = complete(document.path(), transferFileId, signature, certificateBase64, output.path());
+        var signed = storage.commit(output, document.signedName(DocumentFormat.detect(output.path())));
+        return new SignedDocument(signed, signer.getSubjectName().getCommonName());
+    }
+
+    /**
+     * @param certificateBase64 the signer's certificate (DER, Base64), as read by Web PKI
+     */
+    public SignatureStart start(Path file, SignatureFormat format, String certificateBase64) throws IOException {
         var result = switch (format) {
             case PADES -> pkiExpress.execute(pkiExpress.padesSignatureStarter(), starter -> {
                 starter.setPdfToSign(file);

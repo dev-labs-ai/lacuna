@@ -1,9 +1,7 @@
 package com.lacuna.signature;
 
 import com.lacuna.config.LacunaProperties;
-import com.lacuna.document.DocumentFormat;
 import com.lacuna.document.DocumentStorage;
-import com.lacuna.document.InvalidDocumentException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,14 +60,12 @@ public class SignatureController {
             @RequestParam String certContent,
             Model model) throws IOException {
         var document = storage.find(id);
-        if (!format.supports(document.format())) {
-            throw new InvalidDocumentException("Somente arquivos PDF podem receber assinaturas PAdES.");
-        }
+        signatures.checkCertificate(certContent);
         model.addAttribute("document", document);
         model.addAttribute("format", format);
         model.addAttribute("certThumb", certThumb);
         model.addAttribute("certContent", certContent);
-        model.addAttribute("start", signatures.start(document.path(), format, certContent));
+        model.addAttribute("start", signatures.start(document, format, certContent));
         return "sign-complete";
     }
 
@@ -80,11 +76,8 @@ public class SignatureController {
             @RequestParam String signature,
             @RequestParam String certContent,
             RedirectAttributes redirect) throws IOException {
-        var document = storage.find(id);
-        var output = storage.reserve();
-        var signer = signatures.complete(document.path(), transferFileId, signature, certContent, output.path());
-        var signed = storage.commit(output, document.signedName(DocumentFormat.detect(output.path())));
-        redirect.addFlashAttribute("signedBy", signer.getSubjectName().getCommonName());
-        return "redirect:/documents/" + signed.id();
+        var signed = signatures.complete(storage.find(id), transferFileId, signature, certContent);
+        redirect.addFlashAttribute("signedBy", signed.signerName());
+        return "redirect:/documents/" + signed.document().id();
     }
 }
