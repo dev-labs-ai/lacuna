@@ -176,9 +176,10 @@ class ValidationControllerTest {
     }
 
     private Path sign(Path file, SignatureFormat format) throws Exception {
-        var start = signatures.start(file, format, signer.certificateBase64());
+        var certificate = signer.certificateBase64();
+        var start = signatures.start(file, format, certificate);
         var output = Files.createTempFile(workDir, "assinado", null);
-        signatures.complete(file, start.transferFileId(), signer.sign(start.toSignHash()), output);
+        signatures.complete(file, start.transferFileId(), signer.sign(start.toSignHash()), certificate, output);
         return output;
     }
 
@@ -194,7 +195,7 @@ class ValidationControllerTest {
             return starter.start();
         });
         var output = Files.createTempFile(workDir, "destacada", ".p7s");
-        signatures.complete(file, start.getTransferFile(), signer.sign(start.getToSignHash()), output);
+        signatures.complete(file, start.getTransferFile(), signer.sign(start.getToSignHash()), certificate, output);
         return output;
     }
 }

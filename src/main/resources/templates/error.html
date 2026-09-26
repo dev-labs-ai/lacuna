@@ -11,6 +11,10 @@
         <p class="eyebrow" th:text="|Erro ${status}|">Erro</p>
         <h1 th:text="${title} ?: 'Algo deu errado'">Algo deu errado</h1>
         <pre class="message" th:if="${title != null and message != null}" th:text="${message}">mensagem</pre>
+        <details th:if="${details}">
+            <summary>Relatório técnico</summary>
+            <pre th:text="${details}">relatório</pre>
+        </details>
         <div class="actions" th:with="back=${backUrl} ?: '/'">
             <a class="button primary" th:href="@{${back}}"
                th:text="${backLabel} ?: 'Voltar ao início'">Voltar ao início</a>

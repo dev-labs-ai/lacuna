@@ -24,6 +24,7 @@
           th:data-to-sign-hash="${start.toSignHash}"
           th:data-digest-algorithm="${start.digestAlgorithm}">
         <input type="hidden" name="transferFileId" th:value="${start.transferFileId}">
+        <input type="hidden" name="certContent" th:value="${certContent}">
         <input type="hidden" name="signature">
 
         <p class="status" role="status" data-status>Carregando o Web PKI…</p>

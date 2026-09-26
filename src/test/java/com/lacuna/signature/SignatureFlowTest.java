@@ -155,7 +155,8 @@ class SignatureFlowTest {
 
         mvc.perform(post(signPage + "/complete")
                         .param("transferFileId", start.transferFileId())
-                        .param("signature", signer.sign(otherHash)))
+                        .param("signature", signer.sign(otherHash))
+                        .param("certContent", signer.certificateBase64()))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(view().name("error"))
                 .andExpect(model().attribute("backUrl", signPage));
@@ -171,7 +172,8 @@ class SignatureFlowTest {
 
         mvc.perform(post(signPage + "/complete")
                         .param("transferFileId", start.transferFileId())
-                        .param("signature", signer.sign(start.toSignHash())))
+                        .param("signature", signer.sign(start.toSignHash()))
+                        .param("certContent", signer.certificateBase64()))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(content().string(containsString("já foi concluída")));
     }
@@ -182,7 +184,8 @@ class SignatureFlowTest {
 
         mvc.perform(post(signPage + "/complete")
                         .param("transferFileId", "../documents/x")
-                        .param("signature", Base64.getEncoder().encodeToString(new byte[256])))
+                        .param("signature", Base64.getEncoder().encodeToString(new byte[256]))
+                        .param("certContent", signer.certificateBase64()))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(view().name("error"));
     }
@@ -230,7 +233,8 @@ class SignatureFlowTest {
     private String complete(String signPage, SignatureStart start) throws Exception {
         return mvc.perform(post(signPage + "/complete")
                         .param("transferFileId", start.transferFileId())
-                        .param("signature", signer.sign(start.toSignHash())))
+                        .param("signature", signer.sign(start.toSignHash()))
+                        .param("certContent", signer.certificateBase64()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attribute("signedBy", TestSigner.NAME))
                 .andReturn().getResponse().getRedirectedUrl();

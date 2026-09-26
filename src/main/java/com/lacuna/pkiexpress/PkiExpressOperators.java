@@ -3,6 +3,7 @@ package com.lacuna.pkiexpress;
 import com.lacuna.config.LacunaProperties;
 import com.lacunasoftware.pkiexpress.CadesSignatureExplorer;
 import com.lacunasoftware.pkiexpress.CadesSignatureStarter;
+import com.lacunasoftware.pkiexpress.CertificateExplorer;
 import com.lacunasoftware.pkiexpress.PadesSignatureExplorer;
 import com.lacunasoftware.pkiexpress.PadesSignatureStarter;
 import com.lacunasoftware.pkiexpress.PkiExpressConfig;
@@ -59,6 +60,10 @@ public class PkiExpressOperators {
 
     public CadesSignatureExplorer cadesSignatureExplorer() {
         return configure(new CadesSignatureExplorer(config));
+    }
+
+    public CertificateExplorer certificateExplorer() {
+        return configure(new CertificateExplorer(config));
     }
 
     /**

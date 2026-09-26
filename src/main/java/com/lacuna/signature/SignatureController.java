@@ -68,6 +68,7 @@ public class SignatureController {
         model.addAttribute("document", document);
         model.addAttribute("format", format);
         model.addAttribute("certThumb", certThumb);
+        model.addAttribute("certContent", certContent);
         model.addAttribute("start", signatures.start(document.path(), format, certContent));
         return "sign-complete";
     }
@@ -77,10 +78,11 @@ public class SignatureController {
             @PathVariable String id,
             @RequestParam String transferFileId,
             @RequestParam String signature,
+            @RequestParam String certContent,
             RedirectAttributes redirect) throws IOException {
         var document = storage.find(id);
         var output = storage.reserve();
-        var signer = signatures.complete(document.path(), transferFileId, signature, output.path());
+        var signer = signatures.complete(document.path(), transferFileId, signature, certContent, output.path());
         var signed = storage.commit(output, document.signedName(DocumentFormat.detect(output.path())));
         redirect.addFlashAttribute("signedBy", signer.getSubjectName().getCommonName());
         return "redirect:/documents/" + signed.id();

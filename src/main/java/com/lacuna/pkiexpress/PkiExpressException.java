@@ -1,5 +1,7 @@
 package com.lacuna.pkiexpress;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.stream.Collectors;
 
 /**
@@ -8,12 +10,27 @@ import java.util.stream.Collectors;
  */
 public class PkiExpressException extends RuntimeException {
 
+    private final @Nullable String details;
+
     public PkiExpressException(String message) {
+        this(message, (String) null);
+    }
+
+    /**
+     * @param details technical report, such as PKI Express' validation results, shown on request
+     */
+    public PkiExpressException(String message, @Nullable String details) {
         super(message);
+        this.details = details;
     }
 
     private PkiExpressException(String message, Throwable cause) {
         super(message, cause);
+        this.details = null;
+    }
+
+    public @Nullable String details() {
+        return details;
     }
 
     /**

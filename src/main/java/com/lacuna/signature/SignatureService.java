@@ -31,9 +31,11 @@ public class SignatureService {
     private static final Pattern TRANSFER_FILE_ID = Pattern.compile("[0-9a-f]{32}");
 
     private final PkiExpressOperators pkiExpress;
+    private final CertificateValidator certificates;
 
-    public SignatureService(PkiExpressOperators pkiExpress) {
+    public SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates) {
         this.pkiExpress = pkiExpress;
+        this.certificates = certificates;
     }
 
     /**
@@ -61,12 +63,15 @@ public class SignatureService {
     /**
      * Writes the signed file to {@code output}: a PDF for PAdES, a .p7s for CAdES.
      *
-     * @param file           the same file given to {@link #start}
-     * @param transferFileId returned by {@link #start}
-     * @param signature      the hash signed by Web PKI (Base64)
+     * @param file              the same file given to {@link #start}
+     * @param transferFileId    returned by {@link #start}
+     * @param signature         the hash signed by Web PKI (Base64)
+     * @param certificateBase64 the certificate given to {@link #start}, used to explain a rejection
      * @return the signer's certificate
+     * @throws CertificateRejectedException if PKI Express refused the signature because of the certificate
      */
-    public PKCertificate complete(Path file, String transferFileId, String signature, Path output) throws IOException {
+    public PKCertificate complete(Path file, String transferFileId, String signature, String certificateBase64,
+                                  Path output) throws IOException {
         if (!TRANSFER_FILE_ID.matcher(transferFileId).matches()) {
             throw new PkiExpressException("Dados da assinatura inválidos. Reinicie o processo de assinatura.");
         }
@@ -84,11 +89,27 @@ public class SignatureService {
             });
         } catch (PkiExpressException e) {
             Files.deleteIfExists(output);
-            throw e;
+            throw explain(e, certificateBase64);
         } finally {
             // A transfer file serves a single completion, successful or not.
             Files.deleteIfExists(transferFile);
         }
+    }
+
+    /**
+     * PKI Express reports a rejected certificate as its raw validation output. When the certificate is the cause,
+     * report it as a {@link CertificateRejectedException}, which says why in plain words.
+     */
+    private PkiExpressException explain(PkiExpressException failure, String certificateBase64) {
+        try {
+            certificates.requireValid(certificateBase64);
+        } catch (CertificateRejectedException rejected) {
+            rejected.addSuppressed(failure);
+            return rejected;
+        } catch (PkiExpressException | IOException e) {
+            failure.addSuppressed(e);
+        }
+        return failure;
     }
 
     private static SignatureStart toSignatureStart(SignatureStartResult result) {

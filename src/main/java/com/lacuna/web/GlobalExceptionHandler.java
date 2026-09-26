@@ -3,8 +3,10 @@ package com.lacuna.web;
 import com.lacuna.document.DocumentNotFoundException;
 import com.lacuna.document.InvalidDocumentException;
 import com.lacuna.pkiexpress.PkiExpressException;
+import com.lacuna.signature.CertificateRejectedException;
 import com.lacunasoftware.pkiexpress.InstallationNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -13,7 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.ModelAndView;
 
-import java.util.Map;
+import java.util.HashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -43,13 +45,21 @@ public class GlobalExceptionHandler {
                 "O arquivo excede o tamanho máximo permitido para envio.", backFrom(request));
     }
 
+    @ExceptionHandler(CertificateRejectedException.class)
+    public ModelAndView certificateRejected(CertificateRejectedException e, HttpServletRequest request) {
+        log.info("Certificate rejected on {}: {}", request.getRequestURI(), e.getMessage());
+        var back = backFrom(request);
+        return errorView(HttpStatus.UNPROCESSABLE_CONTENT, "Certificado não aceito", e.getMessage(), e.details(),
+                new Back(back.url(), "Escolher outro certificado"));
+    }
+
     @ExceptionHandler(PkiExpressException.class)
     public ModelAndView pkiExpressFailed(PkiExpressException e, HttpServletRequest request) {
         log.warn("PKI Express operation failed on {}", request.getRequestURI(), e);
         var title = SIGNATURE_PATH.matcher(path(request)).matches()
                 ? "Não foi possível assinar o documento"
                 : "Não foi possível concluir a operação";
-        return errorView(HttpStatus.UNPROCESSABLE_CONTENT, title, e.getMessage(), backFrom(request));
+        return errorView(HttpStatus.UNPROCESSABLE_CONTENT, title, e.getMessage(), e.details(), backFrom(request));
     }
 
     @ExceptionHandler(InstallationNotFoundException.class)
@@ -78,12 +88,22 @@ public class GlobalExceptionHandler {
     }
 
     private static ModelAndView errorView(HttpStatus status, String title, String message, Back back) {
-        var view = new ModelAndView("error", Map.of(
-                "status", status.value(),
-                "title", title,
-                "message", message,
-                "backUrl", back.url(),
-                "backLabel", back.label()));
+        return errorView(status, title, message, null, back);
+    }
+
+    /**
+     * @param details technical report shown on request, below the message
+     */
+    private static ModelAndView errorView(HttpStatus status, String title, String message, @Nullable String details,
+                                          Back back) {
+        var model = new HashMap<String, Object>();
+        model.put("status", status.value());
+        model.put("title", title);
+        model.put("message", message);
+        model.put("details", details);
+        model.put("backUrl", back.url());
+        model.put("backLabel", back.label());
+        var view = new ModelAndView("error", model);
         view.setStatus(status);
         return view;
     }
