@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{fragments :: web-pki-scripts})}">
+<head>
+    <title>Assinando · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack">
+    <nav th:replace="~{fragments :: steps(2)}"></nav>
+
+    <div>
+        <h1>Assinando o arquivo</h1>
+        <p th:text="|${document.name} · assinatura ${format.label()}|">arquivo · assinatura</p>
+    </div>
+
+    <!--
+        signature.js signs the hash computed by PKI Express with the chosen certificate, then posts the signature
+        together with the transfer file id so the server can finish the signed file.
+    -->
+    <form id="sign-form" class="card stack" method="post"
+          th:action="@{/documents/{id}/sign/complete(id=${document.id})}"
+          data-step="complete" th:data-web-pki-license="${webPkiLicense}"
+          th:data-cert-thumb="${certThumb}"
+          th:data-to-sign-hash="${start.toSignHash}"
+          th:data-digest-algorithm="${start.digestAlgorithm}">
+        <input type="hidden" name="transferFileId" th:value="${start.transferFileId}">
+        <input type="hidden" name="signature">
+
+        <p class="status" role="status" data-status>Carregando o Web PKI…</p>
+
+        <div class="actions">
+            <a class="button" th:href="@{/documents/{id}/sign(id=${document.id})}">Escolher outro certificado</a>
+        </div>
+    </form>
+
+    <div th:replace="~{fragments :: install-notice}"></div>
+</main>
+</body>
+</html>

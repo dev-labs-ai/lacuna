@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{fragments :: web-pki-scripts})}">
+<head>
+    <title>Escolher certificado · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack">
+    <nav th:replace="~{fragments :: steps(1)}"></nav>
+
+    <div>
+        <h1>Assinar arquivo</h1>
+        <p>
+            Você vai assinar
+            <a th:href="@{/documents/{id}(id=${document.id})}" th:text="${document.name}">arquivo</a>.
+        </p>
+    </div>
+
+    <!--
+        The Web PKI lists the certificates into the <select>. On submit, signature.js reads the chosen certificate
+        into the hidden fields and only then posts the form, together with the signature format.
+    -->
+    <form id="sign-form" class="card stack" method="post"
+          th:action="@{/documents/{id}/sign/start(id=${document.id})}"
+          data-step="start" th:data-web-pki-license="${webPkiLicense}">
+        <input type="hidden" name="certThumb">
+        <input type="hidden" name="certContent">
+
+        <fieldset class="field" th:if="${formats.size() > 1}">
+            <legend>Formato da assinatura</legend>
+            <label class="choice">
+                <input type="radio" name="format" value="PADES" checked>
+                <span><strong>PAdES</strong> — a assinatura fica dentro do PDF, que continua abrindo em qualquer
+                    leitor de PDF.</span>
+            </label>
+            <label class="choice">
+                <input type="radio" name="format" value="CADES">
+                <span><strong>CAdES</strong> — gera um arquivo .p7s que contém o PDF e a assinatura.</span>
+            </label>
+        </fieldset>
+        <th:block th:if="${formats.size() == 1}">
+            <input type="hidden" name="format" th:value="${formats[0]}">
+            <p th:if="${document.format.name() == 'CMS'}" class="hint">
+                Este arquivo já é uma assinatura CAdES: a sua assinatura será adicionada a ele (coassinatura).
+            </p>
+            <p th:unless="${document.format.name() == 'CMS'}" class="hint">
+                Formato da assinatura: <strong>CAdES</strong>. Será gerado um arquivo .p7s que contém o arquivo e a
+                assinatura.
+            </p>
+        </th:block>
+
+        <div class="field">
+            <label for="certificate">Certificado digital <span class="required" aria-hidden="true">*</span></label>
+            <select id="certificate" required aria-describedby="certificate-hint"></select>
+            <p id="certificate-hint" class="hint">
+                Certificados instalados neste computador ou em tokens e smartcards conectados.
+            </p>
+        </div>
+
+        <div class="actions">
+            <button type="submit" class="button primary" disabled>Assinar</button>
+            <button type="button" class="button" data-action="refresh" disabled>Atualizar lista</button>
+        </div>
+
+        <p class="status" role="status" data-status>Carregando o Web PKI…</p>
+    </form>
+
+    <div th:replace="~{fragments :: install-notice}"></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<nav th:fragment="steps(current)" aria-label="Etapas da assinatura">
+    <ol class="steps">
+        <li th:classappend="${current > 1} ? 'done'" th:aria-current="${current == 1} ? 'step'">Certificado</li>
+        <li th:classappend="${current > 2} ? 'done'" th:aria-current="${current == 2} ? 'step'">Assinatura</li>
+        <li th:aria-current="${current == 3} ? 'step'">Concluído</li>
+    </ol>
+</nav>
+
+<!-- Signatures of a SignatureReport, with their validation. -->
+<th:block th:fragment="signers(report)">
+    <p th:if="${report.signers.empty}">Nenhuma assinatura encontrada.</p>
+
+    <ol class="signers stack" th:unless="${report.signers.empty}">
+        <li class="card stack" th:each="signer : ${report.signers}">
+            <div class="signer-head">
+                <h3 th:text="${signer.timestamp} ? |Carimbo do tempo: ${signer.name}| : ${signer.name}">Nome</h3>
+                <span th:if="${signer.valid}" class="badge valid"><span aria-hidden="true">✓</span> Válida</span>
+                <span th:unless="${signer.valid}" class="badge invalid"><span aria-hidden="true">✗</span> Inválida</span>
+            </div>
+
+            <dl class="details">
+                <th:block th:if="${!#strings.isEmpty(signer.cpf)}">
+                    <dt>CPF</dt>
+                    <dd th:text="${signer.cpf}">000.000.000-00</dd>
+                </th:block>
+                <th:block th:if="${!#strings.isEmpty(signer.email)}">
+                    <dt>E-mail</dt>
+                    <dd th:text="${signer.email}">email</dd>
+                </th:block>
+                <dt>Emissor</dt>
+                <dd th:text="${signer.issuer}">AC</dd>
+                <th:block th:if="${signer.signingTime}">
+                    <dt>Data da assinatura</dt>
+                    <dd th:text="${#temporals.format(signer.signingTime, 'dd/MM/yyyy HH:mm:ss xxx')}">data</dd>
+                </th:block>
+            </dl>
+
+            <ul class="problems error" th:unless="${signer.errors.empty}">
+                <li th:each="error : ${signer.errors}" th:text="${error}">erro</li>
+            </ul>
+            <ul class="problems warning" th:unless="${signer.warnings.empty}">
+                <li th:each="warning : ${signer.warnings}" th:text="${warning}">alerta</li>
+            </ul>
+
+            <details>
+                <summary>Relatório de validação</summary>
+                <pre th:text="${signer.report}">relatório</pre>
+            </details>
+        </li>
+    </ol>
+</th:block>
+
+<div th:fragment="install-notice" class="notice warning stack" data-install-notice hidden>
+    <p><strong>O Web PKI não está pronto neste navegador.</strong></p>
+    <p data-install-message></p>
+    <div class="actions">
+        <button type="button" class="button primary" data-action="install">Instalar o Web PKI</button>
+    </div>
+</div>
+
+<!-- Web PKI JavaScript library, see https://docs.lacunasoftware.com/articles/web-pki/get-started -->
+<th:block th:fragment="web-pki-scripts">
+    <script src="https://cdn.lacunasoftware.com/libs/web-pki/lacuna-web-pki-2.18.0.min.js"
+            integrity="sha256-utM/CTsggW5QWTZgkLcAwVGkMBhYKTz3n0992V4r2y4="
+            crossorigin="anonymous"></script>
+    <script th:src="@{/js/signature.js}"></script>
+</th:block>
+
+</body>
+</html>

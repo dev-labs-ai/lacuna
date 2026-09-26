@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{})}">
+<head>
+    <title>Assinar arquivo · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack">
+    <div>
+        <h1>Assinatura digital de arquivos</h1>
+        <p class="lead">
+            Assine com o seu certificado digital. A chave privada nunca sai do seu computador: o navegador assina com
+            o Web PKI e o servidor monta o arquivo assinado com o PKI Express.
+        </p>
+    </div>
+
+    <section class="card stack" aria-labelledby="upload-title">
+        <h2 id="upload-title">Enviar arquivo</h2>
+        <ul class="formats">
+            <li><strong>PDF:</strong> escolha entre PAdES (assinatura dentro do próprio PDF) e CAdES (arquivo .p7s).</li>
+            <li><strong>Outros arquivos:</strong> assinados em CAdES, gerando um .p7s que contém o arquivo.</li>
+            <li><strong>Assinatura CAdES (.p7s):</strong> recebe mais uma assinatura (coassinatura).</li>
+        </ul>
+        <form class="stack" th:action="@{/documents}" method="post" enctype="multipart/form-data" data-busy-on-submit>
+            <div class="field">
+                <label for="file">Arquivo <span class="required" aria-hidden="true">*</span></label>
+                <input type="file" id="file" name="file" required>
+            </div>
+            <div class="actions">
+                <button type="submit" class="button primary">Enviar e assinar</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card stack" aria-labelledby="sample-title">
+        <h2 id="sample-title">Sem um arquivo à mão?</h2>
+        <p>Use um PDF de exemplo para testar o fluxo de assinatura.</p>
+        <form th:action="@{/documents/sample}" method="post" data-busy-on-submit>
+            <button type="submit" class="button">Usar documento de exemplo</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{})}">
+<head>
+    <title>Documento · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack"
+      th:with="pdf=${document.format.name() == 'PDF'}, cades=${document.format.name() == 'CMS'},
+               canSign=${!cades or (report != null and report.contentIncluded)}">
+    <th:block th:if="${signedBy}">
+        <nav th:replace="~{fragments :: steps(3)}"></nav>
+        <div class="notice success" role="status">
+            <p><span aria-hidden="true">✓</span> Arquivo assinado por <strong th:text="${signedBy}">Fulano</strong>.</p>
+        </div>
+    </th:block>
+
+    <div class="stack">
+        <div>
+            <p class="eyebrow" th:text="${pdf} ? 'PDF' : (${cades} ? 'Assinatura CAdES (.p7s)' : 'Arquivo')">Tipo</p>
+            <h1 class="file-name" th:text="${document.name}">documento.pdf</h1>
+        </div>
+        <div class="actions">
+            <a class="button primary" th:href="@{/documents/{id}/file(id=${document.id})}"
+               th:download="${document.name}">Baixar</a>
+            <a th:if="${pdf}" class="button" th:href="@{/documents/{id}/file(id=${document.id})}"
+               target="_blank" rel="noopener">Visualizar</a>
+            <a th:if="${cades and report != null and report.contentIncluded}" class="button"
+               th:href="@{/documents/{id}/content(id=${document.id})}">Baixar arquivo original</a>
+            <a th:if="${canSign}" class="button" th:href="@{/documents/{id}/sign(id=${document.id})}"
+               th:text="${report == null or report.signers.empty} ? 'Assinar' : 'Adicionar assinatura'">Assinar</a>
+        </div>
+    </div>
+
+    <section class="stack" aria-labelledby="signers-title" th:unless="${pdf or cades}">
+        <h2 id="signers-title">Assinaturas</h2>
+        <p>Este arquivo não contém assinaturas. Ao assinar, será gerado um arquivo CAdES (.p7s) com ele.</p>
+    </section>
+
+    <section class="stack" aria-labelledby="signers-title" th:if="${pdf or cades}">
+        <h2 id="signers-title" th:text="${report} ? |Assinaturas ${report.format.label()} (${report.signers.size()})| : 'Assinaturas'">
+            Assinaturas</h2>
+        <div th:if="${reportError}" class="notice warning">
+            <p th:text="${reportError}">erro</p>
+        </div>
+        <p th:if="${cades and report != null and !report.contentIncluded}" class="hint">
+            Assinatura destacada: o arquivo assinado não está dentro do .p7s, por isso não é possível baixá-lo nem
+            coassinar aqui.
+        </p>
+        <th:block th:if="${report}">
+            <th:block th:replace="~{fragments :: signers(${report})}"></th:block>
+        </th:block>
+    </section>
+</main>
+</body>
+</html>

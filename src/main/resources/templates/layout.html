@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" th:fragment="page(pageTitle, pageMain, pageScripts)">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title th:replace="${pageTitle}">Assinador Digital</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body>
+<header class="site-header">
+    <div class="container">
+        <a class="brand" th:href="@{/}">Assinador Digital</a>
+        <span class="tagline">PAdES e CAdES com Lacuna PKI Express + Web PKI</span>
+    </div>
+</header>
+<main th:replace="${pageMain}"></main>
+<th:block th:replace="${pageScripts}"></th:block>
+</body>
+</html>
