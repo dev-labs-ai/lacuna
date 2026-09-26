@@ -1,0 +1,7 @@
+# Only what the image build needs; tests run outside it (they need an activated pkie).
+*
+!.mvn/
+!mvnw
+!pom.xml
+!src/main/
+!docker/

@@ -20,6 +20,7 @@ User-facing text is Brazilian Portuguese; code, comments and commit messages are
 ./mvnw test -Dtest=SignatureFlowTest                      # one class, @Nested classes included
 ./mvnw test -Dtest='SignatureFlowTest#signsPdfWithPades'  # one method
 ./mvnw package
+docker compose up --build                                 # needs the license in ./LacunaPkiLicense.config
 ```
 
 There is no linter or formatter configured.
@@ -90,6 +91,15 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
 - Only PDFs are served inline; any other download is `attachment` + `application/octet-stream` + `nosniff`, because
   uploads can be any file.
 - Batches are capped at 20 files because Tomcat accepts at most 50 multipart parts (`server.tomcat.max-part-count`).
+- Docker: the image carries `pkie` but not the license; `docker/entrypoint.sh` activates it on start. The activation
+  is bound to the hostname and MAC addresses (the only machine data in `pkie activate <license> --request` codes), so
+  `compose.yaml` pins both and keeps `/etc/pkie` in a volume: without that, every re-created container activates
+  again. The entrypoint also activates when the file holds another license (the trial license from
+  `LacunaSoftware/PkiSuiteSamples` is renewed monthly), telling licenses apart by `<Signature>`, which `--check`
+  prints too. `pkie activate` quirks: it exits 0 even when activation fails (it falls back to a manual activation
+  request), so judge by `--check`; it prints the license signature, so keep its output out of the logs; it reads a
+  license *file* only when the name ends in `.config` (otherwise: "not a valid Base64 string"). The image build skips
+  the tests (they need an activated `pkie`); `pkie` crashes without `libicu`.
 - Spring Boot 4: the app's JSON uses Jackson 3 (`tools.jackson.*`) while pki-express uses Jackson 2 internally;
   `@AutoConfigureMockMvc` lives in `org.springframework.boot.webmvc.test.autoconfigure`; use
   `org.jspecify.annotations.Nullable`.

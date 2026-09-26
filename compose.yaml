@@ -1,0 +1,31 @@
+# docker compose up --build    ->  http://localhost:8080 (Web PKI needs no license on localhost)
+services:
+  app:
+    build: .
+    image: lacuna
+    ports:
+      - "8080:8080"
+    environment:
+      # dev trusts Lacuna's test PKI (application-dev.properties). SPRING_PROFILES_ACTIVE=default runs without it.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    secrets:
+      - source: pkie_license
+        # pkie only reads a license file whose name ends in .config; anything else it decodes as Base64.
+        target: pkie_license.config
+    # PKI Express binds its activation to the hostname and MAC addresses: pinned, the activation kept in the pkie
+    # volume stays valid when the container is re-created (new image, docker compose down/up).
+    hostname: lacuna
+    networks:
+      default:
+        mac_address: "02:00:00:00:00:01"
+    volumes:
+      - pkie:/etc/pkie
+      - documents:/var/lib/lacuna
+
+secrets:
+  pkie_license:
+    file: ./LacunaPkiLicense.config
+
+volumes:
+  pkie:
+  documents:

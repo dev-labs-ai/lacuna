@@ -40,6 +40,51 @@ fica só na conclusão, feita pelo PKI Express). Para testar sem um certificado 
 `src/test/resources/pierre-de-fermat.pfx` (senha `1234`) no repositório de certificados do navegador
 (Chrome: Configurações → Privacidade e segurança → Segurança → Gerenciar certificados).
 
+### Com Docker
+
+Só é preciso Docker e a licença do PKI Express na raiz do projeto, em `LacunaPkiLicense.config` (fora do git). A de
+avaliação vem dos exemplos da Lacuna (veja [Renovar a licença](#renovar-a-licença)):
+
+```bash
+curl -fsSL -o LacunaPkiLicense.config \
+  https://raw.githubusercontent.com/LacunaSoftware/PkiSuiteSamples/master/java/springmvc/LacunaPkiLicense.config
+docker compose up --build
+```
+
+Acesse http://localhost:8080. O compose usa o perfil `dev` (`SPRING_PROFILES_ACTIVE=default docker compose up` roda
+sem ele). As propriedades da [configuração](#configuração) também podem ser passadas como variáveis de ambiente, por
+exemplo `LACUNA_WEB_PKI_LICENSE`.
+
+A imagem já traz o PKI Express (versão em `PKIE_VERSION`, no `Dockerfile`), mas não a licença: o PKI Express é ativado
+quando o container inicia (`docker/entrypoint.sh`). A ativação fica presa ao hostname e aos endereços MAC, que o
+Docker troca a cada container novo. Por isso o `compose.yaml` fixa os dois e guarda `/etc/pkie` no volume `pkie`, e a
+ativação só é refeita quando eles mudam, quando o volume é apagado (`docker compose down -v`) ou quando o arquivo traz
+outra licença. Os documentos ficam no volume `documents`.
+
+O build da imagem não roda os testes, porque eles precisam de um `pkie` ativado. Rode `./mvnw test` na máquina.
+
+#### Renovar a licença
+
+A licença de avaliação dos exemplos da Lacuna
+([PkiSuiteSamples](https://github.com/LacunaSoftware/PkiSuiteSamples)) é renovada no começo de cada mês e vale por
+cerca de dois meses. O container informa no log quando a licença ativada expira:
+
+```bash
+docker compose logs app | grep expires
+```
+
+Para renovar, antes ou depois de ela expirar, baixe a licença nova no lugar da atual (na raiz do projeto) e reinicie o
+container:
+
+```bash
+curl -fsSL -o LacunaPkiLicense.config \
+  https://raw.githubusercontent.com/LacunaSoftware/PkiSuiteSamples/master/java/springmvc/LacunaPkiLicense.config
+docker compose restart
+```
+
+Ao iniciar, o container percebe que o arquivo traz outra licença e a ativa pela internet. Se a ativação falhar, ele
+para e mostra a mensagem do PKI Express (`docker compose logs app`).
+
 ## Fluxo de assinatura
 
 | Etapa | Onde | O que acontece |
