@@ -1,0 +1,100 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+Spring Boot 4.1 (Java 25) + Thymeleaf app that signs and validates files with Lacuna's
+[PKI Express](https://docs.lacunasoftware.com/articles/pki-express/java) (server side, the `pkie` executable driven by
+the `pki-express` Java library) and [Web PKI](https://docs.lacunasoftware.com/articles/web-pki/get-started) (browser
+extension + native app that signs hashes with the user's private key). PDFs are signed in PAdES or CAdES, any other
+file in CAdES (attached `.p7s`); there is also a validator (`/validate`) and a batch signature page (`/batch`).
+User-facing text is Brazilian Portuguese; code, comments and commit messages are English. Configuration properties
+(`lacuna.*`) are documented in `README.md` and `LacunaProperties`.
+
+## Commands
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev     # http://localhost:8080
+./mvnw test
+./mvnw test -Dtest=SignatureFlowTest                      # one class, @Nested classes included
+./mvnw test -Dtest='SignatureFlowTest#signsPdfWithPades'  # one method
+./mvnw package
+```
+
+There is no linter or formatter configured.
+
+## What the app and the tests need
+
+- `pkie` on the `PATH`, installed and license-activated (`pkie` with no arguments prints its version). Tests that
+  drive it carry `@EnabledIf("com.lacuna.support.TestSigner#pkiExpressInstalled")` and are **skipped silently** when
+  it is missing: check the skipped counts in `target/surefire-reports`, not just a green build.
+- Network access: the default policies (PAdES with LTV, CAdES ICP-Brasil AD-RB) fetch CRLs from Lacuna's test CA.
+- `TestSigner` stands in for Web PKI in tests, with Lacuna's public test certificate
+  `src/test/resources/pierre-de-fermat.pfx` (password `1234`), which is only trusted with
+  `lacuna.pki-express.trust-lacuna-test-root=true`.
+- The `dev` profile trusts Lacuna's test root and turns off certificate validation on selection. Without it, Lacuna
+  test certificates are rejected ("Lacuna Root Test v3 is not trusted"); that is the intended default.
+- Web PKI cannot run in automated browsers (no extension), so `static/js/*.js` is not covered by tests; check those
+  changes in a real browser on `localhost`, where Web PKI needs no license.
+
+## Architecture
+
+Every signature is PKI Express' three-step remote flow:
+
+1. **start**: `PadesSignatureStarter` / `CadesSignatureStarter` take the file and the user's certificate (read by Web
+   PKI) and return the hash to sign plus the id of a *transfer file* kept in `<storage>/pkie-transfer`.
+2. **sign**: the browser signs the hash with Web PKI (`signHash`).
+3. **complete**: `SignatureFinisher` embeds the signature value. Transfer files are single use:
+   `SignatureService.complete` validates the id format (it comes from the client) and deletes the file whether the
+   completion succeeds or not.
+
+Packages under `com.lacuna`:
+
+- `pkiexpress` — `PkiExpressOperators` is the only place that creates PKI Express operators and applies the
+  configuration (trusted roots, policies, culture, time zone). Run operators through `execute(operator, operation)`,
+  which disposes their temp files and turns the library's `RuntimeException`s (raw `pkie` console output) into
+  `PkiExpressException`, whose message is shown to users (`details()` holds the technical report).
+- `signature` — `SignatureService` (the flow above, plus `checkCertificate` to refuse a certificate before the user
+  signs); `SignatureController` (server-rendered pages with form posts, as in Lacuna's samples);
+  `SignatureApiController` (the same flow as JSON for the batch page, errors as RFC 9457 `ProblemDetail` through its
+  own `@ExceptionHandler`s, which win over the HTML `GlobalExceptionHandler`); `BatchSignatureController`;
+  `CertificateValidator` + `CertificateRejectedException`, which explains rejections by `ValidationItemTypes`, never by
+  matching message text.
+- `validation` — `ValidationService` opens and validates PAdES and CAdES signatures (detached CAdES needs the
+  original file) and extracts the file inside a `.p7s`.
+- `document` — `DocumentStorage` keeps files named by UUID with a JSON metadata sidecar (only canonical UUIDs reach the
+  file system). `DocumentFormat` tells PDF / CMS / other apart from the content bytes, never from the file name.
+  `SignatureFormat` holds the rules: PDFs take PAdES or CAdES, anything else CAdES, and an existing `.p7s` is co-signed.
+- `web.GlobalExceptionHandler` — HTML error page; picks the "back" link from the request path.
+
+Front end: Thymeleaf pages wrap the layout fragment `layout :: page(pageTitle, pageMain, pageScripts)`; plain
+JavaScript in `static/js`, no build step. `signature.js` drives the single-file pages (`data-step="start"` or
+`"complete"`); `batch-signature.js` calls `preauthorizeSignatures` once (one PIN for the whole batch), then start,
+`signHash` and complete for each file through the JSON API.
+
+## Gotchas
+
+- Check pki-express library behavior against the resolved jar (`javap -cp ~/.m2/repository/com/lacunasoftware/pkiexpress/pki-express/<version>/pki-express-<version>.jar ...`):
+  its `-sources.jar` does not always match the bytecode. The `pkie` CLI is the quickest way to probe PKI Express
+  itself, e.g. `pkie start-cades <file> <cert.cer> <transfer-file> --trust-test` or `pkie open-cades <file> --validate`.
+- With `culture=pt-BR`, validation items come in Portuguese, but many failures (trust errors on completion, .NET
+  exceptions) still come in English.
+- A CAdES signing time has one-second resolution: the same signer co-signing the same content twice within a second
+  produces an identical signature, which PKI Express does not add. Tests that co-sign use `TestSigner.awaitNextSecond()`.
+- Thymeleaf: `th:replace`/`th:insert` are processed before `th:if` on the same element, so put the condition on a
+  wrapping `th:block`. Don't name model attributes `pageTitle`, `pageMain` or `pageScripts`.
+- The Web PKI script is loaded from Lacuna's CDN with an SRI hash (`templates/fragments.html`); a version bump needs a
+  new hash (`openssl dgst -sha256 -binary lacuna-web-pki-<version>.min.js | base64`).
+- Web PKI promises: `.fail(cb)` replaces the `defaultFail` callback given to `init`.
+- Only PDFs are served inline; any other download is `attachment` + `application/octet-stream` + `nosniff`, because
+  uploads can be any file.
+- Batches are capped at 20 files because Tomcat accepts at most 50 multipart parts (`server.tomcat.max-part-count`).
+- Spring Boot 4: the app's JSON uses Jackson 3 (`tools.jackson.*`) while pki-express uses Jackson 2 internally;
+  `@AutoConfigureMockMvc` lives in `org.springframework.boot.webmvc.test.autoconfigure`; use
+  `org.jspecify.annotations.Nullable`.
+
+## Conventions
+
+Commits follow Conventional Commits in English (scopes in use: `signature`, `validation`), one logical change per
+commit, each commit passing the tests on its own.
