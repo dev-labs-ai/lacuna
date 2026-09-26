@@ -55,7 +55,7 @@ public class BatchSignatureController {
         var ids = new ArrayList<String>();
         for (var file : selected) {
             try (var content = file.getInputStream()) {
-                ids.add(storage.store(file.getOriginalFilename(), content).id());
+                ids.add(storage.store(file.getOriginalFilename(), content).id().toString());
             }
         }
         return "redirect:" + UriComponentsBuilder.fromPath("/batch/sign").queryParam("documents", ids).toUriString();

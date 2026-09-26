@@ -1,5 +1,6 @@
 package com.lacuna.signature;
 
+import com.lacuna.support.TestInfrastructure;
 import com.lacuna.support.TestSigner;
 import com.lacuna.validation.SignatureReport;
 import com.lacuna.validation.SignerView;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
@@ -41,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@link TestSigner} standing in for Web PKI.
  */
 @SpringBootTest(properties = "lacuna.pki-express.trust-lacuna-test-root=true")
+@ImportTestcontainers(TestInfrastructure.class)
 @AutoConfigureMockMvc
 @EnabledIf("com.lacuna.support.TestSigner#pkiExpressInstalled")
 class SignatureApiTest {

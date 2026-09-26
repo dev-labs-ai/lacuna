@@ -31,4 +31,28 @@ class DocumentFormatTest {
 
         assertThat(DocumentFormat.detect(new ByteArrayInputStream(content))).isEqualTo(expected);
     }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "PDF|documento.txt|pdf",
+            "CMS|contrato.pdf.p7s|p7s",
+            "OTHER|planilha.XLSX|xlsx",
+            "OTHER|relatório|bin",
+            "OTHER|arquivo.tar.gz|gz",
+            "OTHER|nota.a b|bin",
+    })
+    void takesTheExtensionOfTheFormatOrElseOfTheName(DocumentFormat format, String fileName, String expected) {
+        assertThat(format.extension(fileName)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "application/pdf, PDF",
+            "application/pkcs7-signature, CMS",
+            "application/octet-stream, OTHER",
+            "text/plain, OTHER",
+    })
+    void comesBackFromItsMimeType(String mimeType, DocumentFormat expected) {
+        assertThat(DocumentFormat.ofMimeType(mimeType)).isEqualTo(expected);
+    }
 }

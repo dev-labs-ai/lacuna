@@ -4,6 +4,7 @@ import com.lacunasoftware.pkiexpress.StandardSignaturePolicies;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -48,15 +49,25 @@ public record LacunaProperties(
     }
 
     /**
-     * @param dir folder where uploaded and signed documents, PKI Express temp files and transfer files are kept;
-     *            defaults to {@code <java.io.tmpdir>/lacuna}
+     * Documents are objects in an S3 bucket, described by a row in the database.
+     *
+     * @param dir    local working folder: PKI Express temp and transfer files, and copies of documents while PKI Express
+     *               works on them; defaults to {@code <java.io.tmpdir>/lacuna}
+     * @param bucket S3 bucket of the documents, created on startup if missing
      */
-    public record Storage(Path dir) {
+    public record Storage(Path dir, @DefaultValue("documents") String bucket, @DefaultValue S3 s3) {
 
         public Storage {
             if (dir == null) {
                 dir = Path.of(System.getProperty("java.io.tmpdir"), "lacuna");
             }
         }
+    }
+
+    /**
+     * @param endpoint  URL of an S3-compatible server such as MinIO, addressed path-style; when empty, AWS S3
+     * @param accessKey when empty, credentials come from the AWS default chain (environment, profile, role)
+     */
+    public record S3(URI endpoint, @DefaultValue("us-east-1") String region, String accessKey, String secretKey) {
     }
 }

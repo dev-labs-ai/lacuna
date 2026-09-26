@@ -26,10 +26,12 @@ que falharem podem ser reenviados.
   ([instalação](https://docs.lacunasoftware.com/articles/pki-express/setup)). Em outra pasta, configure
   `lacuna.pki-express.home`.
 - Web PKI (extensão + componente nativo) no navegador do usuário. Sem ele, a página de assinatura oferece a instalação.
+- PostgreSQL e um armazenamento S3 (MinIO): o `compose.yaml` sobe os dois com Docker.
 
 ## Executar
 
 ```bash
+docker compose up -d postgres minio
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
@@ -51,15 +53,20 @@ curl -fsSL -o LacunaPkiLicense.config \
 docker compose up --build
 ```
 
-Acesse http://localhost:8080. O compose usa o perfil `dev` (`SPRING_PROFILES_ACTIVE=default docker compose up` roda
-sem ele). As propriedades da [configuração](#configuração) também podem ser passadas como variáveis de ambiente, por
-exemplo `LACUNA_WEB_PKI_LICENSE`.
+Acesse http://localhost:8080. O compose sobe também o PostgreSQL e o MinIO (console em http://localhost:9001, usuário
+`lacuna`, senha `lacuna-secret`; credenciais só de desenvolvimento) e usa o perfil `dev`
+(`SPRING_PROFILES_ACTIVE=default docker compose up` roda sem ele). As propriedades da [configuração](#configuração)
+também podem ser passadas como variáveis de ambiente, por exemplo `LACUNA_WEB_PKI_LICENSE`.
+
+O MinIO não publica mais imagens Docker (o repositório foi arquivado em abril de 2026); o compose usa a que a
+Chainguard compila do código do MinIO, `cgr.dev/chainguard/minio`, gratuita só na tag `latest`. Como o app fala S3
+padrão, trocar de servidor é só mudar o `compose.yaml`.
 
 A imagem já traz o PKI Express (versão em `PKIE_VERSION`, no `Dockerfile`), mas não a licença: o PKI Express é ativado
 quando o container inicia (`docker/entrypoint.sh`). A ativação fica presa ao hostname e aos endereços MAC, que o
 Docker troca a cada container novo. Por isso o `compose.yaml` fixa os dois e guarda `/etc/pkie` no volume `pkie`, e a
 ativação só é refeita quando eles mudam, quando o volume é apagado (`docker compose down -v`) ou quando o arquivo traz
-outra licença. Os documentos ficam no volume `documents`.
+outra licença. Os dados ficam nos volumes `postgres` e `minio`.
 
 O build da imagem não roda os testes, porque eles precisam de um `pkie` ativado. Rode `./mvnw test` na máquina.
 
@@ -95,13 +102,34 @@ para e mostra a mensagem do PKI Express (`docker compose logs app`).
 | 4 | `POST /documents/{id}/sign/complete` | `SignatureFinisher` insere a assinatura e grava o arquivo assinado como um novo documento |
 | 5 | `GET /documents/{id}` | `PadesSignatureExplorer` ou `CadesSignatureExplorer` lista e valida as assinaturas |
 
+## Armazenamento
+
+Cada documento, enviado ou assinado, é um objeto no bucket (`lacuna.storage.bucket`) e uma linha na tabela
+`document` do PostgreSQL (migrações do Flyway em `src/main/resources/db/migration`):
+
+| Coluna | |
+|---|---|
+| `id` | UUID versão 7, que também dá nome ao objeto |
+| `bucket`, `object_key` | Onde está o objeto: `AAAA/MM/DD/<id>.<extensão>`, com a data (UTC) em que foi guardado, por exemplo `2026/09/26/01a0dec1-1590-7bd0-ab56-8d349e958db8.pdf` |
+| `file_name` | Nome original, usado na tela e nos downloads |
+| `size_bytes`, `mime_type` | Tamanho e tipo: `application/pdf`, `application/pkcs7-signature` (`.p7s`) ou `application/octet-stream` |
+| `signed_at` | Data e hora (UTC) da assinatura que gerou o arquivo, lida do próprio arquivo assinado; vazia nos arquivos enviados |
+
+O UUID versão 7 começa pelo instante de criação em milissegundos e termina com 74 bits aleatórios: os ids crescem com
+o tempo, então entram no fim do índice da chave primária (o v4, aleatório, espalha as inserções pelo índice) e a
+listagem de um dia no bucket sai em ordem de gravação. O app gera o id antes de gravar o objeto, cujo nome o contém;
+o Java 25 ainda não gera v7 (o Java 26 tem `UUID.ofEpochMillis`), por isso a classe `UuidV7`.
+
+O PKI Express trabalha com arquivos locais: o app baixa uma cópia do documento para `lacuna.storage.dir` enquanto o
+PKI Express trabalha e a apaga em seguida.
+
 | Classe | Responsabilidade |
 |---|---|
 | `PkiExpressOperators` | Cria os operadores do PKI Express já configurados (confiança, políticas, idioma, fuso) |
 | `SignatureService` | Início e conclusão de assinaturas PAdES e CAdES |
 | `SignatureApiController` | Versão JSON do fluxo de assinatura, usada pela assinatura em lote |
 | `ValidationService` | Validação de PDFs e `.p7s` e extração do arquivo contido num `.p7s` |
-| `DocumentStorage` | Armazenamento dos arquivos e seus metadados (nome, formato) |
+| `DocumentStorage` | Documentos no S3 com seus dados na tabela `document` (via `DocumentRepository`) |
 
 ## Configuração
 
@@ -116,7 +144,12 @@ para e mostra a mensagem do PKI Express (`docker compose logs app`).
 | `lacuna.pki-express.offline` | `false` | Não consulta LCR/OCSP |
 | `lacuna.signature.validate-certificate-on-selection` | `true` (`false` no perfil `dev`) | Valida o certificado escolhido antes de pedir a assinatura |
 | `lacuna.web-pki.license` | — | Licença do Web PKI (Base64 ou JSON), necessária fora de `localhost` |
-| `lacuna.storage.dir` | `<java.io.tmpdir>/lacuna` | Documentos e arquivos de trabalho do PKI Express |
+| `spring.datasource.url` / `username` / `password` | — (PostgreSQL do compose no perfil `dev`) | Banco de dados |
+| `lacuna.storage.bucket` | `documents` | Bucket dos documentos, criado na inicialização se não existir |
+| `lacuna.storage.s3.endpoint` | — (AWS S3; MinIO do compose no perfil `dev`) | Servidor compatível com S3 |
+| `lacuna.storage.s3.region` | `us-east-1` | Região S3 |
+| `lacuna.storage.s3.access-key` / `secret-key` | — (cadeia padrão da AWS) | Credenciais S3 |
+| `lacuna.storage.dir` | `<java.io.tmpdir>/lacuna` | Arquivos de trabalho do PKI Express e cópias temporárias dos documentos |
 
 As políticas padrão são as mesmas do PKI Express. A data da assinatura sai em UTC no carimbo do PDF, que não tem como
 saber onde será lido, e no fuso do navegador na página do documento.
@@ -127,11 +160,15 @@ saber onde será lido, e no fuso do navegador na página do documento.
 ./mvnw test
 ```
 
-`SignatureFlowTest` e `ValidationControllerTest` executam os fluxos contra o PKI Express local, fazendo em Java o
-papel do Web PKI com o certificado de teste (`TestSigner`). Eles são ignorados quando `pkie` não está no `PATH`.
+Os testes precisam de Docker: o Testcontainers sobe PostgreSQL e MinIO com as mesmas imagens do compose
+(`TestInfrastructure`). `SignatureFlowTest` e `ValidationControllerTest` executam os fluxos contra o PKI Express
+local, fazendo em Java o papel do Web PKI com o certificado de teste (`TestSigner`). Eles são ignorados quando `pkie`
+não está no `PATH`.
 
 ## Antes de ir para produção
 
 - Configure a licença do Web PKI e mantenha `trust-lacuna-test-root=false`.
-- Troque o armazenamento em disco (`DocumentStorage`) pelo da sua aplicação e adicione autenticação/CSRF.
+- Adicione autenticação/CSRF: hoje quem tem o link de um documento o acessa.
+- Passe as credenciais do banco e do S3 por variáveis de ambiente ou secrets, e crie o bucket com a sua
+  infraestrutura; o app só o cria quando não existe.
 - Arquivos de transferência de assinaturas abandonadas ficam em `<storage>/pkie-transfer`; remova-os periodicamente.

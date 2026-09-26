@@ -9,12 +9,14 @@ Spring Boot 4.1 (Java 25) + Thymeleaf app that signs and validates files with La
 the `pki-express` Java library) and [Web PKI](https://docs.lacunasoftware.com/articles/web-pki/get-started) (browser
 extension + native app that signs hashes with the user's private key). PDFs are signed in PAdES or CAdES, any other
 file in CAdES (attached `.p7s`); there is also a validator (`/validate`) and a batch signature page (`/batch`).
+Documents are objects in S3 (MinIO locally) described by rows in PostgreSQL.
 User-facing text is Brazilian Portuguese; code, comments and commit messages are English. Configuration properties
 (`lacuna.*`) are documented in `README.md` and `LacunaProperties`.
 
 ## Commands
 
 ```bash
+docker compose up -d postgres minio                        # what spring-boot:run and the dev profile expect
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev     # http://localhost:8080
 ./mvnw test
 ./mvnw test -Dtest=SignatureFlowTest                      # one class, @Nested classes included
@@ -30,6 +32,9 @@ There is no linter or formatter configured.
 - `pkie` on the `PATH`, installed and license-activated (`pkie` with no arguments prints its version). Tests that
   drive it carry `@EnabledIf("com.lacuna.support.TestSigner#pkiExpressInstalled")` and are **skipped silently** when
   it is missing: check the skipped counts in `target/surefire-reports`, not just a green build.
+- Docker, for every test that starts the application: `TestInfrastructure` runs PostgreSQL and MinIO with
+  Testcontainers, shared across test classes. A new `@SpringBootTest` class needs
+  `@ImportTestcontainers(TestInfrastructure.class)`.
 - Network access: the default policies (PAdES with LTV, CAdES ICP-Brasil AD-RB) fetch CRLs from Lacuna's test CA.
 - `TestSigner` stands in for Web PKI in tests, with Lacuna's public test certificate
   `src/test/resources/pierre-de-fermat.pfx` (password `1234`), which is only trusted with
@@ -64,8 +69,14 @@ Packages under `com.lacuna`:
   matching message text.
 - `validation` — `ValidationService` opens and validates PAdES and CAdES signatures (detached CAdES needs the
   original file) and extracts the file inside a `.p7s`.
-- `document` — `DocumentStorage` keeps files named by UUID with a JSON metadata sidecar (only canonical UUIDs reach the
-  file system). `DocumentFormat` tells PDF / CMS / other apart from the content bytes, never from the file name.
+- `document` — `DocumentStorage` keeps each document (upload or signed file) as an S3 object under
+  `yyyy/MM/dd/<id>.<extension>` (UTC storage date) plus a row in the `document` table (`DocumentRepository`,
+  `JdbcClient`; schema in Flyway's `db/migration`). Ids are UUID v7 from `UuidV7`, generated before the object is
+  written since its key contains them (Java 25 has no v7; Java 26's `UUID.ofEpochMillis` can replace it). The object
+  is written first and deleted if the insert fails. PKI Express needs local files: `copyToWorkFolder` / `newWorkFile`
+  return a `WorkFile` in `<storage>/work`, deleted on close, so use try-with-resources. `signed_at` is read back from
+  the signed file (newest signer's time), not the completion time. `DocumentFormat` tells PDF / CMS / other apart
+  from the content bytes, never from the file name, and maps each to its MIME type (stored) and extension.
   `SignatureFormat` holds the rules: PDFs take PAdES or CAdES, anything else CAdES, and an existing `.p7s` is co-signed.
 - `web.GlobalExceptionHandler` — HTML error page; picks the "back" link from the request path.
 
@@ -103,6 +114,12 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
   request), so judge by `--check`; it prints the license signature, so keep its output out of the logs; it reads a
   license *file* only when the name ends in `.config` (otherwise: "not a valid Base64 string"). The image build skips
   the tests (they need an activated `pkie`); `pkie` crashes without `libicu`.
+- Docker networks (compose, Testcontainers) add and remove interfaces on the host, whose MAC addresses are part of
+  the *host's* `pkie` activation: tests may then fail with "Your hardware has changed since PKI Express was
+  activated"; rerun them, or renew the host activation with `sudo pkie activate`.
+- MinIO no longer publishes images (repository archived in April 2026): compose and tests use Chainguard's
+  `cgr.dev/chainguard/minio:latest`, free only as `latest`. Its `/data` must be a volume (or tmpfs in tests), or
+  MinIO logs "Rename across devices not allowed". PostgreSQL 18 images keep data under `/var/lib/postgresql`.
 - Spring Boot 4: the app's JSON uses Jackson 3 (`tools.jackson.*`) while pki-express uses Jackson 2 internally;
   `@AutoConfigureMockMvc` lives in `org.springframework.boot.webmvc.test.autoconfigure`; use
   `org.jspecify.annotations.Nullable`.

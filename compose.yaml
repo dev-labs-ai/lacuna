@@ -1,4 +1,7 @@
 # docker compose up --build    ->  http://localhost:8080 (Web PKI needs no license on localhost)
+# Only the database and the object store, for ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev:
+#   docker compose up -d postgres minio
+# Credentials here and in application-dev.properties are for development only.
 services:
   app:
     build: .
@@ -8,6 +11,17 @@ services:
     environment:
       # dev trusts Lacuna's test PKI (application-dev.properties). SPRING_PROFILES_ACTIVE=default runs without it.
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/lacuna
+      SPRING_DATASOURCE_USERNAME: lacuna
+      SPRING_DATASOURCE_PASSWORD: lacuna
+      LACUNA_STORAGE_S3_ENDPOINT: http://minio:9000
+      LACUNA_STORAGE_S3_ACCESS_KEY: lacuna
+      LACUNA_STORAGE_S3_SECRET_KEY: lacuna-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     secrets:
       - source: pkie_license
         # pkie only reads a license file whose name ends in .config; anything else it decodes as Base64.
@@ -20,7 +34,41 @@ services:
         mac_address: "02:00:00:00:00:01"
     volumes:
       - pkie:/etc/pkie
-      - documents:/var/lib/lacuna
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: lacuna
+      POSTGRES_USER: lacuna
+      POSTGRES_PASSWORD: lacuna
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username", "lacuna", "--dbname", "lacuna"]
+      interval: 2s
+      retries: 30
+    volumes:
+      # PostgreSQL 18 images keep their data under /var/lib/postgresql/18.
+      - postgres:/var/lib/postgresql
+
+  minio:
+    # MinIO no longer publishes images; Chainguard builds this one from MinIO's sources (free only as "latest").
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: lacuna
+      MINIO_ROOT_PASSWORD: lacuna-secret
+      # The "local" alias of the MinIO client, for the health check.
+      MC_HOST_local: http://lacuna:lacuna-secret@localhost:9000
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      retries: 30
+    volumes:
+      - minio:/data
 
 secrets:
   pkie_license:
@@ -28,4 +76,5 @@ secrets:
 
 volumes:
   pkie:
-  documents:
+  postgres:
+  minio:

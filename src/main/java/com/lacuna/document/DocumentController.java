@@ -4,7 +4,7 @@ import com.lacuna.pkiexpress.PkiExpressException;
 import com.lacuna.validation.ValidationService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -63,8 +63,8 @@ public class DocumentController {
         var document = storage.find(id);
         model.addAttribute("document", document);
         if (document.format() != DocumentFormat.OTHER) {
-            try {
-                model.addAttribute("report", validation.validate(document.path(), null));
+            try (var file = storage.copyToWorkFolder(document)) {
+                model.addAttribute("report", validation.validate(file.path(), null));
             } catch (PkiExpressException e) {
                 model.addAttribute("reportError", e.getMessage());
             }
@@ -75,7 +75,9 @@ public class DocumentController {
     @GetMapping("/documents/{id}/file")
     public ResponseEntity<Resource> file(@PathVariable String id) {
         var document = storage.find(id);
-        return download(new FileSystemResource(document.path()), document.name(), document.format() == DocumentFormat.PDF);
+        // Streamed from S3; the message converter closes the stream.
+        return download(new InputStreamResource(storage.openContent(document)), document.sizeBytes(), document.name(),
+                document.format() == DocumentFormat.PDF);
     }
 
     /**
@@ -87,12 +89,10 @@ public class DocumentController {
         if (document.format() != DocumentFormat.CMS) {
             throw new DocumentNotFoundException(id);
         }
-        var extracted = Files.createTempFile("lacuna-content", null);
-        try {
-            validation.extractContent(document.path(), extracted);
-            return download(new ByteArrayResource(Files.readAllBytes(extracted)), document.contentName(), false);
-        } finally {
-            Files.deleteIfExists(extracted);
+        try (var signature = storage.copyToWorkFolder(document); var extracted = storage.newWorkFile()) {
+            validation.extractContent(signature.path(), extracted.path());
+            var content = Files.readAllBytes(extracted.path());
+            return download(new ByteArrayResource(content), content.length, document.contentName(), false);
         }
     }
 
@@ -100,10 +100,11 @@ public class DocumentController {
      * Only PDFs are shown in the browser; anything else is downloaded, so an uploaded HTML page, for instance, never
      * runs on this site.
      */
-    private static ResponseEntity<Resource> download(Resource body, String name, boolean inlinePdf) {
+    private static ResponseEntity<Resource> download(Resource body, long length, String name, boolean inlinePdf) {
         var disposition = inlinePdf ? ContentDisposition.inline() : ContentDisposition.attachment();
         return ResponseEntity.ok()
                 .contentType(inlinePdf ? MediaType.APPLICATION_PDF : MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(length)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.filename(name, StandardCharsets.UTF_8).build().toString())
                 .header("X-Content-Type-Options", "nosniff")
                 .body(body);

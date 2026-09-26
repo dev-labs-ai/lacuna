@@ -1,9 +1,11 @@
 package com.lacuna.document;
 
+import com.lacuna.support.TestInfrastructure;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -30,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Document pages that do not need PKI Express.
  */
 @SpringBootTest
+@ImportTestcontainers(TestInfrastructure.class)
 @AutoConfigureMockMvc
 class DocumentControllerTest {
 

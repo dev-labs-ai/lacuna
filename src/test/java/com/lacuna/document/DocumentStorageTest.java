@@ -1,74 +1,152 @@
 package com.lacuna.document;
 
-import com.lacuna.config.LacunaProperties;
-import org.junit.jupiter.api.BeforeEach;
+import com.lacuna.support.TestInfrastructure;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import tools.jackson.databind.json.JsonMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.context.ImportTestcontainers;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Against PostgreSQL and MinIO in Docker.
+ */
+@SpringBootTest
+@ImportTestcontainers(TestInfrastructure.class)
 class DocumentStorageTest {
 
-    @TempDir
-    Path dir;
+    private static final byte[] PDF = "%PDF-1.4\n...".getBytes(StandardCharsets.US_ASCII);
 
+    @TempDir
+    static Path storageDir;
+
+    @Autowired
     DocumentStorage storage;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        storage = new DocumentStorage(new LacunaProperties(
-                new LacunaProperties.PkiExpress(null, false, List.of(), false, null, null, null),
-                new LacunaProperties.Signature(true),
-                new LacunaProperties.WebPki(null),
-                new LacunaProperties.Storage(dir)), new JsonMapper());
+    @Autowired
+    JdbcClient jdbc;
+
+    @Autowired
+    S3Client s3;
+
+    @DynamicPropertySource
+    static void storage(DynamicPropertyRegistry registry) {
+        registry.add("lacuna.storage.dir", storageDir::toString);
     }
 
     @Test
     void storesAndFindsDocument() throws Exception {
-        var content = "%PDF-1.4\n...".getBytes(StandardCharsets.US_ASCII);
+        var stored = storage.store("contrato.pdf", new ByteArrayInputStream(PDF));
 
-        var stored = storage.store("contrato.pdf", new ByteArrayInputStream(content));
-
-        var found = storage.find(stored.id());
+        var found = storage.find(stored.id().toString());
         assertThat(found).isEqualTo(stored);
+        assertThat(found.id().version()).isEqualTo(7);
         assertThat(found.name()).isEqualTo("contrato.pdf");
         assertThat(found.format()).isEqualTo(DocumentFormat.PDF);
-        assertThat(Files.readAllBytes(found.path())).isEqualTo(content);
+        assertThat(found.sizeBytes()).isEqualTo(PDF.length);
+        assertThat(found.signedAt()).isNull();
+        try (var content = storage.openContent(found)) {
+            assertThat(content.readAllBytes()).isEqualTo(PDF);
+        }
     }
 
     @Test
-    void storesAnyKindOfFile() throws Exception {
+    void namesObjectsByUtcDateAndId() throws Exception {
+        var today = DateTimeFormatter.ofPattern("yyyy/MM/dd").format(OffsetDateTime.now(ZoneOffset.UTC));
+
+        var stored = storage.store("contrato.pdf", new ByteArrayInputStream(PDF));
+
+        assertThat(stored.bucket()).isEqualTo("documents");
+        assertThat(stored.objectKey()).isEqualTo(today + "/" + stored.id() + ".pdf");
+        var object = s3.headObject(request -> request.bucket("documents").key(stored.objectKey()));
+        assertThat(object.contentLength()).isEqualTo(PDF.length);
+        assertThat(object.contentType()).isEqualTo("application/pdf");
+    }
+
+    @Test
+    void keepsTheExtensionOfOtherFiles() throws Exception {
         var stored = storage.store("planilha.xlsx", new ByteArrayInputStream(new byte[] {'P', 'K', 3, 4}));
 
-        assertThat(storage.find(stored.id()).format()).isEqualTo(DocumentFormat.OTHER);
+        assertThat(stored.format()).isEqualTo(DocumentFormat.OTHER);
+        assertThat(stored.mimeType()).isEqualTo("application/octet-stream");
+        assertThat(stored.objectKey()).endsWith("/" + stored.id() + ".xlsx");
+    }
+
+    @Test
+    void recordsWhatIsKnownAboutTheFile() throws Exception {
+        var signedAt = Instant.parse("2026-09-26T16:40:45Z");
+        var file = Files.write(storageDir.resolve("assinado.pdf"), PDF);
+
+        var stored = storage.storeSigned(file, "contrato.pdf", signedAt);
+
+        var row = jdbc.sql("SELECT * FROM document WHERE id = :id").param("id", stored.id()).query().singleRow();
+        assertThat(row).containsEntry("bucket", "documents")
+                .containsEntry("object_key", stored.objectKey())
+                .containsEntry("file_name", "contrato.pdf")
+                .containsEntry("size_bytes", (long) PDF.length)
+                .containsEntry("mime_type", "application/pdf");
+        assertThat(jdbc.sql("SELECT signed_at AT TIME ZONE 'UTC' FROM document WHERE id = :id")
+                .param("id", stored.id()).query(String.class).single()).isEqualTo("2026-09-26 16:40:45");
+        assertThat(storage.find(stored.id().toString()).signedAt()).isEqualTo(signedAt);
+        assertThat(file).exists();
     }
 
     @Test
     void rejectsEmptyFile() {
+        var rows = countDocuments();
+
         assertThatThrownBy(() -> storage.store("vazio.pdf", new ByteArrayInputStream(new byte[0])))
                 .isInstanceOf(InvalidDocumentException.class);
-        assertThat(dir.resolve("documents")).isEmptyDirectory();
+        assertThat(countDocuments()).isEqualTo(rows);
+        assertThat(storageDir.resolve("work")).isEmptyDirectory();
     }
 
     @Test
-    void reservedDocumentExistsOnlyOnceCommitted() throws Exception {
-        var reservation = storage.reserve();
-        Files.writeString(reservation.path(), "conteúdo");
+    void copiesDocumentsToTheWorkFolderUntilClosed() throws Exception {
+        var stored = storage.store("contrato.pdf", new ByteArrayInputStream(PDF));
 
-        assertThatThrownBy(() -> storage.find(reservation.id())).isInstanceOf(DocumentNotFoundException.class);
-        assertThat(storage.commit(reservation, "nota.txt").name()).isEqualTo("nota.txt");
-        assertThat(storage.find(reservation.id()).name()).isEqualTo("nota.txt");
+        Path copy;
+        try (var file = storage.copyToWorkFolder(stored)) {
+            copy = file.path();
+            assertThat(copy).hasBinaryContent(PDF).startsWith(storageDir.resolve("work"));
+        }
+        assertThat(copy).doesNotExist();
+    }
+
+    /**
+     * Half an hour after and before midnight UTC: on a machine west of UTC the local date of the first is still the
+     * 26th, east of it the local date of the second is already the 27th, so a local date fails at least one.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            // 20:30 on the 26th in Cuiabá (UTC-4) is 00:30 on the 27th in UTC
+            "2026-09-26T20:30:00-04:00, 2026/09/27",
+            // 02:30 on the 27th in Moscow (UTC+3) is 23:30 on the 26th in UTC
+            "2026-09-27T02:30:00+03:00, 2026/09/26",
+    })
+    void datesObjectKeysInUtc(OffsetDateTime storedAt, String folder) {
+        var id = UUID.fromString("01a0dec1-1590-7bd0-ab56-8d349e958db8");
+
+        assertThat(DocumentStorage.objectKey(id, storedAt.toInstant(), "pdf")).isEqualTo(folder + "/" + id + ".pdf");
     }
 
     @ParameterizedTest
@@ -79,9 +157,8 @@ class DocumentStorageTest {
 
     @Test
     void rejectsUnknownId() {
-        var id = storage.reserve().id();
-
-        assertThatThrownBy(() -> storage.find(id)).isInstanceOf(DocumentNotFoundException.class);
+        assertThatThrownBy(() -> storage.find(UUID.randomUUID().toString()))
+                .isInstanceOf(DocumentNotFoundException.class);
     }
 
     @ParameterizedTest
@@ -101,5 +178,9 @@ class DocumentStorageTest {
         var name = "a".repeat(300) + ".pdf";
 
         assertThat(DocumentStorage.sanitize(name)).hasSize(200).endsWith(".pdf");
+    }
+
+    private long countDocuments() {
+        return jdbc.sql("SELECT count(*) FROM document").query(Long.class).single();
     }
 }

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
  * JSON version of the signature round trips, for pages that sign several documents without reloading, such as the
@@ -134,6 +135,6 @@ public class SignatureApiController {
     /**
      * @param url page of the signed document
      */
-    public record CompleteResponse(String id, String name, String url, String signerName) {
+    public record CompleteResponse(UUID id, String name, String url, String signerName) {
     }
 }

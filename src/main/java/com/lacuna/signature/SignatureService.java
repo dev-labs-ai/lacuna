@@ -7,6 +7,7 @@ import com.lacuna.document.InvalidDocumentException;
 import com.lacuna.document.StoredDocument;
 import com.lacuna.pkiexpress.PkiExpressException;
 import com.lacuna.pkiexpress.PkiExpressOperators;
+import com.lacunasoftware.pkiexpress.CadesSignerInfo;
 import com.lacunasoftware.pkiexpress.PKCertificate;
 import com.lacunasoftware.pkiexpress.PadesSize;
 import com.lacunasoftware.pkiexpress.PadesVisualAutoPositioning;
@@ -19,6 +20,11 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -69,7 +75,9 @@ public class SignatureService {
         if (!format.supports(document.format())) {
             throw new InvalidDocumentException("Somente arquivos PDF podem receber assinaturas PAdES.");
         }
-        return start(document.path(), format, certificateBase64);
+        try (var file = storage.copyToWorkFolder(document)) {
+            return start(file.path(), format, certificateBase64);
+        }
     }
 
     /**
@@ -77,10 +85,13 @@ public class SignatureService {
      */
     public SignedDocument complete(StoredDocument document, String transferFileId, String signature,
                                    String certificateBase64) throws IOException {
-        var output = storage.reserve();
-        var signer = complete(document.path(), transferFileId, signature, certificateBase64, output.path());
-        var signed = storage.commit(output, document.signedName(DocumentFormat.detect(output.path())));
-        return new SignedDocument(signed, signer.getSubjectName().getCommonName());
+        try (var file = storage.copyToWorkFolder(document); var output = storage.newWorkFile()) {
+            var signer = complete(file.path(), transferFileId, signature, certificateBase64, output.path());
+            var format = DocumentFormat.detect(output.path());
+            var signed = storage.storeSigned(output.path(), document.signedName(format),
+                    signingTime(output.path(), format));
+            return new SignedDocument(signed, signer.getSubjectName().getCommonName());
+        }
     }
 
     /**
@@ -155,6 +166,31 @@ public class SignatureService {
             failure.addSuppressed(e);
         }
         return failure;
+    }
+
+    /**
+     * When the newest signature in a file was made, as recorded in the file (the PDF signature's /M entry, the CAdES
+     * signing-time attribute): that of the signature just added, since signing again only adds signatures.
+     */
+    private Instant signingTime(Path signedFile, DocumentFormat format) throws IOException {
+        List<? extends CadesSignerInfo> signers = switch (format) {
+            case PDF -> pkiExpress.execute(pkiExpress.padesSignatureExplorer(), explorer -> {
+                explorer.setSignatureFile(signedFile);
+                return explorer.open().getSigners();
+            });
+            case CMS -> pkiExpress.execute(pkiExpress.cadesSignatureExplorer(), explorer -> {
+                explorer.setSignatureFile(signedFile);
+                return explorer.open().getSigners();
+            });
+            case OTHER -> List.of();
+        };
+        return signers.stream()
+                .map(CadesSignerInfo::getSigningTime)
+                .filter(Objects::nonNull)
+                .map(Date::toInstant)
+                .max(Comparator.naturalOrder())
+                // A signature policy may leave the signing time out; the completion time is then the closest.
+                .orElseGet(Instant::now);
     }
 
     private static SignatureStart toSignatureStart(SignatureStartResult result) {

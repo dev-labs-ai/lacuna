@@ -1,5 +1,6 @@
 package com.lacuna.signature;
 
+import com.lacuna.support.TestInfrastructure;
 import com.lacuna.support.TestSigner;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -31,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Signing with a certificate PKI Express does not trust: Lacuna's test certificate, with the test root not trusted.
  */
 @SpringBootTest(properties = "lacuna.pki-express.trust-lacuna-test-root=false")
+@ImportTestcontainers(TestInfrastructure.class)
 @AutoConfigureMockMvc
 @EnabledIf("com.lacuna.support.TestSigner#pkiExpressInstalled")
 class UntrustedCertificateTest {

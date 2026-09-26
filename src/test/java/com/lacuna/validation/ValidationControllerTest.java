@@ -3,6 +3,7 @@ package com.lacuna.validation;
 import com.lacuna.pkiexpress.PkiExpressOperators;
 import com.lacuna.signature.SignatureFormat;
 import com.lacuna.signature.SignatureService;
+import com.lacuna.support.TestInfrastructure;
 import com.lacuna.support.TestSigner;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
@@ -33,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @SpringBootTest(properties = "lacuna.pki-express.trust-lacuna-test-root=true")
+@ImportTestcontainers(TestInfrastructure.class)
 @AutoConfigureMockMvc
 @EnabledIf("com.lacuna.support.TestSigner#pkiExpressInstalled")
 class ValidationControllerTest {

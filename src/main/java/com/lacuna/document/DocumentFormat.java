@@ -7,18 +7,51 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Locale;
 
 /**
  * File formats the application tells apart, detected from the content rather than from the file name.
  */
 public enum DocumentFormat {
 
-    PDF,
+    PDF("application/pdf", "pdf"),
     /**
      * CMS SignedData, i.e. a CAdES signature file (.p7s).
      */
-    CMS,
-    OTHER;
+    CMS("application/pkcs7-signature", "p7s"),
+    /**
+     * Anything else; its content is not inspected, so it is stored as plain bytes, with the extension of its name.
+     */
+    OTHER("application/octet-stream", null);
+
+    private final String mimeType;
+    private final String extension;
+
+    DocumentFormat(String mimeType, String extension) {
+        this.mimeType = mimeType;
+        this.extension = extension;
+    }
+
+    public String mimeType() {
+        return mimeType;
+    }
+
+    /**
+     * Extension for a file of this format, without the dot: the format's own, or else the one in the file name
+     * (letters and digits only), or else "bin".
+     */
+    public String extension(String fileName) {
+        if (extension != null) {
+            return extension;
+        }
+        var dot = fileName.lastIndexOf('.');
+        var own = dot < 0 ? "" : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return own.matches("[a-z0-9]{1,10}") ? own : "bin";
+    }
+
+    public static DocumentFormat ofMimeType(String mimeType) {
+        return Arrays.stream(values()).filter(format -> format.mimeType.equals(mimeType)).findFirst().orElse(OTHER);
+    }
 
     private static final byte[] PDF_HEADER = "%PDF-".getBytes(StandardCharsets.US_ASCII);
     // DER of the content type OID of a CMS SignedData (1.2.840.113549.1.7.2).
