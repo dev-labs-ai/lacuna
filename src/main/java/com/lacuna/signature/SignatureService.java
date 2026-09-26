@@ -1,5 +1,6 @@
 package com.lacuna.signature;
 
+import com.lacuna.config.LacunaProperties;
 import com.lacuna.pkiexpress.PkiExpressException;
 import com.lacuna.pkiexpress.PkiExpressOperators;
 import com.lacunasoftware.pkiexpress.PKCertificate;
@@ -32,16 +33,23 @@ public class SignatureService {
 
     private final PkiExpressOperators pkiExpress;
     private final CertificateValidator certificates;
+    private final boolean validateCertificateOnSelection;
 
-    public SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates) {
+    public SignatureService(PkiExpressOperators pkiExpress, CertificateValidator certificates, LacunaProperties properties) {
         this.pkiExpress = pkiExpress;
         this.certificates = certificates;
+        this.validateCertificateOnSelection = properties.signature().validateCertificateOnSelection();
     }
 
     /**
      * @param certificateBase64 the signer's certificate (DER, Base64), as read by Web PKI
+     * @throws CertificateRejectedException if validation on selection is enabled and the certificate is not accepted
      */
     public SignatureStart start(Path file, SignatureFormat format, String certificateBase64) throws IOException {
+        // PKI Express only validates the certificate on completion, after the user has signed (and typed a PIN).
+        if (validateCertificateOnSelection) {
+            certificates.requireValid(certificateBase64);
+        }
         var result = switch (format) {
             case PADES -> pkiExpress.execute(pkiExpress.padesSignatureStarter(), starter -> {
                 starter.setPdfToSign(file);

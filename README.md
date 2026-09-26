@@ -30,7 +30,8 @@ inclusive assinaturas CAdES destacadas, que exigem também o arquivo original.
 
 Acesse http://localhost:8080. Sem licença, o Web PKI só funciona em `localhost`.
 
-O perfil `dev` aceita certificados da PKI de teste da Lacuna. Para testar sem um certificado ICP-Brasil, importe
+O perfil `dev` aceita certificados da PKI de teste da Lacuna e não valida o certificado ao escolhê-lo (a validação
+fica só na conclusão, feita pelo PKI Express). Para testar sem um certificado ICP-Brasil, importe
 `src/test/resources/pierre-de-fermat.pfx` (senha `1234`) no repositório de certificados do navegador
 (Chrome: Configurações → Privacidade e segurança → Segurança → Gerenciar certificados).
 
@@ -39,7 +40,7 @@ O perfil `dev` aceita certificados da PKI de teste da Lacuna. Para testar sem um
 | Etapa | Onde | O que acontece |
 |---|---|---|
 | 1 | `sign.html` + `signature.js` | O usuário escolhe o formato (se for PDF) e o certificado, que o Web PKI lê e envia ao servidor |
-| 2 | `POST /documents/{id}/sign/start` | `PadesSignatureStarter` ou `CadesSignatureStarter` calcula o hash a assinar e grava o arquivo de transferência |
+| 2 | `POST /documents/{id}/sign/start` | `CertificateValidator` recusa certificados não aceitos; `PadesSignatureStarter` ou `CadesSignatureStarter` calcula o hash a assinar e grava o arquivo de transferência |
 | 3 | `sign-complete.html` + `signature.js` | O Web PKI assina o hash com a chave privada do usuário |
 | 4 | `POST /documents/{id}/sign/complete` | `SignatureFinisher` insere a assinatura e grava o arquivo assinado como um novo documento |
 | 5 | `GET /documents/{id}` | `PadesSignatureExplorer` ou `CadesSignatureExplorer` lista e valida as assinaturas |
@@ -62,6 +63,7 @@ O perfil `dev` aceita certificados da PKI de teste da Lacuna. Para testar sem um
 | `lacuna.pki-express.cades-policy` | `PkiBrazilCadesAdrBasica` | Política CAdES (ICP-Brasil AD-RB) |
 | `lacuna.pki-express.culture` / `time-zone` | `pt-BR` / `America/Sao_Paulo` | Idioma das mensagens e data do carimbo visual |
 | `lacuna.pki-express.offline` | `false` | Não consulta LCR/OCSP |
+| `lacuna.signature.validate-certificate-on-selection` | `true` (`false` no perfil `dev`) | Valida o certificado escolhido antes de pedir a assinatura |
 | `lacuna.web-pki.license` | — | Licença do Web PKI (Base64 ou JSON), necessária fora de `localhost` |
 | `lacuna.storage.dir` | `<java.io.tmpdir>/lacuna` | Documentos e arquivos de trabalho do PKI Express |
 

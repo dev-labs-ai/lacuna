@@ -2,6 +2,7 @@ package com.lacuna.signature;
 
 import com.lacuna.support.TestSigner;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.io.TempDir;
@@ -10,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -50,19 +52,38 @@ class UntrustedCertificateTest {
     }
 
     @Test
-    void explainsRejectionOnCompletion() throws Exception {
+    void refusesCertificateBeforeTheUserSigns() throws Exception {
         var signPage = uploadSample(mvc);
-        var start = (SignatureStart) start(mvc, signPage)
-                .andExpect(status().isOk())
-                .andReturn().getModelAndView().getModel().get("start");
 
-        var completion = mvc.perform(post(signPage + "/complete")
-                .param("transferFileId", start.transferFileId())
-                .param("signature", signer.sign(start.toSignHash()))
-                .param("certContent", signer.certificateBase64()));
+        expectRejection(start(mvc, signPage), signPage);
 
-        expectRejection(completion, signPage);
         assertThat(storageDir.resolve("pkie-transfer")).isEmptyDirectory();
+    }
+
+    /**
+     * As in the dev profile: PKI Express only checks the certificate on completion.
+     */
+    @Nested
+    @TestPropertySource(properties = "lacuna.signature.validate-certificate-on-selection=false")
+    class WithoutValidationOnSelection {
+
+        @Autowired
+        MockMvc mvc;
+
+        @Test
+        void explainsRejectionOnCompletion() throws Exception {
+            var signPage = uploadSample(mvc);
+            var start = (SignatureStart) start(mvc, signPage)
+                    .andExpect(status().isOk())
+                    .andReturn().getModelAndView().getModel().get("start");
+
+            var completion = mvc.perform(post(signPage + "/complete")
+                    .param("transferFileId", start.transferFileId())
+                    .param("signature", signer.sign(start.toSignHash()))
+                    .param("certContent", signer.certificateBase64()));
+
+            expectRejection(completion, signPage);
+        }
     }
 
     private static void expectRejection(ResultActions result, String signPage) throws Exception {

@@ -10,8 +10,16 @@ import java.util.List;
 @ConfigurationProperties("lacuna")
 public record LacunaProperties(
         @DefaultValue PkiExpress pkiExpress,
+        @DefaultValue Signature signature,
         @DefaultValue WebPki webPki,
         @DefaultValue Storage storage) {
+
+    /**
+     * @param validateCertificateOnSelection validate the chosen certificate before asking the user to sign, instead of
+     *                                       learning only on completion that PKI Express rejects it
+     */
+    public record Signature(@DefaultValue("true") boolean validateCertificateOnSelection) {
+    }
 
     /**
      * @param home                 folder containing the {@code pkie} executable; when empty, {@code pkie} is resolved
