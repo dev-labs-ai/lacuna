@@ -133,9 +133,9 @@ class ValidationControllerTest {
 
     @Test
     void summarizesResult() throws Exception {
-        var signed = sign(sign(samplePdf(), SignatureFormat.CADES), SignatureFormat.CADES);
+        var signed = sign(sign(samplePdf(), SignatureFormat.PADES), SignatureFormat.PADES);
 
-        mvc.perform(upload("signedFile", "assinado.p7s", signed))
+        mvc.perform(upload("signedFile", "assinado.pdf", signed))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Todas as 2 assinaturas são válidas.")));
     }

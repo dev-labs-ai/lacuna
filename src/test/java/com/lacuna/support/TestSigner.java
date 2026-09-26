@@ -59,6 +59,15 @@ public final class TestSigner {
     }
 
     /**
+     * Waits for the clock to reach the next second. A CAdES signing time has a one-second resolution, so the same
+     * signer signing the same content twice within one second produces the very same signature, which PKI Express
+     * does not add again. Call it between co-signatures of the same content by this signer.
+     */
+    public static void awaitNextSecond() throws InterruptedException {
+        Thread.sleep(1000 - System.currentTimeMillis() % 1000 + 10);
+    }
+
+    /**
      * Equivalent of Web PKI's readCertificate().
      */
     public String certificateBase64() throws GeneralSecurityException {

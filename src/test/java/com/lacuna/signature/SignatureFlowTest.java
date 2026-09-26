@@ -131,6 +131,7 @@ class SignatureFlowTest {
     @Test
     void cosignsCadesSignature() throws Exception {
         var signedOnce = sign(uploadSample(), SignatureFormat.CADES);
+        TestSigner.awaitNextSecond();
 
         var signedTwice = sign(signedOnce + "/sign", SignatureFormat.CADES);
 
