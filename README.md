@@ -14,6 +14,11 @@ do computador do usuário: o navegador assina com o
 O tipo do arquivo é detectado pelo conteúdo, não pela extensão. O validador (`/validate`) aceita PDFs e `.p7s`,
 inclusive assinaturas CAdES destacadas, que exigem também o arquivo original.
 
+A assinatura em lote (`/batch`) assina até 20 arquivos de uma vez: o usuário escolhe o certificado e autoriza todas
+as assinaturas uma única vez no Web PKI (`preauthorizeSignatures`), inclusive o PIN de tokens. A página então assina
+cada arquivo pela API JSON (`/api/documents/{id}/signature/start` e `/complete`) e mostra o resultado de cada um; os
+que falharem podem ser reenviados.
+
 ## Pré-requisitos
 
 - Java 25
@@ -49,6 +54,7 @@ fica só na conclusão, feita pelo PKI Express). Para testar sem um certificado 
 |---|---|
 | `PkiExpressOperators` | Cria os operadores do PKI Express já configurados (confiança, políticas, idioma, fuso) |
 | `SignatureService` | Início e conclusão de assinaturas PAdES e CAdES |
+| `SignatureApiController` | Versão JSON do fluxo de assinatura, usada pela assinatura em lote |
 | `ValidationService` | Validação de PDFs e `.p7s` e extração do arquivo contido num `.p7s` |
 | `DocumentStorage` | Armazenamento dos arquivos e seus metadados (nome, formato) |
 

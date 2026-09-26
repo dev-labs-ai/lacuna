@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{})}">
+<head>
+    <title>Assinar em lote · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack">
+    <div>
+        <h1>Assinar em lote</h1>
+        <p class="lead">
+            Assine vários arquivos de uma vez: você escolhe o certificado e autoriza as assinaturas uma única vez
+            (inclusive o PIN, se o certificado estiver num token ou smartcard).
+        </p>
+    </div>
+
+    <section class="card stack" aria-labelledby="upload-title">
+        <h2 id="upload-title">Enviar arquivos</h2>
+        <ul class="formats">
+            <li><strong>PDFs:</strong> assinados em PAdES ou CAdES, à sua escolha na próxima etapa.</li>
+            <li><strong>Outros arquivos:</strong> assinados em CAdES (.p7s); arquivos .p7s recebem mais uma assinatura.</li>
+        </ul>
+        <form class="stack" th:action="@{/batch}" method="post" enctype="multipart/form-data" data-busy-on-submit>
+            <div class="field">
+                <label for="files">Arquivos <span class="required" aria-hidden="true">*</span></label>
+                <input type="file" id="files" name="files" multiple required aria-describedby="files-hint">
+                <p id="files-hint" class="hint" th:text="|Até ${maxFiles} arquivos por vez.|">Até 20 arquivos por vez.</p>
+            </div>
+            <div class="actions">
+                <button type="submit" class="button primary">Enviar e assinar</button>
+            </div>
+        </form>
+    </section>
+</main>
+</body>
+</html>

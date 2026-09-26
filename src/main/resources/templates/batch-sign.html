@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::title}, ~{::main}, ~{fragments :: web-pki-scripts('/js/batch-signature.js')})}">
+<head>
+    <title>Assinar em lote · Assinador Digital</title>
+</head>
+<body>
+<main class="container stack">
+    <div>
+        <h1>Assinar em lote</h1>
+        <p th:text="${documents.size() == 1} ? '1 arquivo para assinar.' : |${documents.size()} arquivos para assinar.|">
+            Arquivos para assinar.</p>
+    </div>
+
+    <!--
+        batch-signature.js reads the chosen certificate, has the user authorize all the signatures once, then signs
+        each file through the JSON API (see SignatureApiController), reporting the progress in the list below.
+    -->
+    <form id="batch-form" class="card stack" th:data-api="@{/api}" th:data-web-pki-license="${webPkiLicense}">
+        <fieldset class="field" th:if="${hasPdf}">
+            <legend>Formato da assinatura dos PDFs</legend>
+            <label class="choice">
+                <input type="radio" name="pdfFormat" value="PADES" checked>
+                <span><strong>PAdES</strong> — a assinatura fica dentro de cada PDF.</span>
+            </label>
+            <label class="choice">
+                <input type="radio" name="pdfFormat" value="CADES">
+                <span><strong>CAdES</strong> — gera um arquivo .p7s para cada PDF.</span>
+            </label>
+        </fieldset>
+        <p class="hint">Os demais arquivos são assinados em CAdES (.p7s).</p>
+
+        <div class="field">
+            <label for="certificate">Certificado digital <span class="required" aria-hidden="true">*</span></label>
+            <select id="certificate" required aria-describedby="certificate-hint"></select>
+            <p id="certificate-hint" class="hint">
+                Certificados instalados neste computador ou em tokens e smartcards conectados.
+            </p>
+        </div>
+
+        <div class="actions">
+            <button type="submit" class="button primary" disabled
+                    th:text="${documents.size() == 1} ? 'Assinar 1 arquivo' : |Assinar ${documents.size()} arquivos|">
+                Assinar</button>
+            <button type="button" class="button" data-action="refresh" disabled>Atualizar lista</button>
+        </div>
+
+        <p class="status" role="status" data-status>Carregando o Web PKI…</p>
+        <details data-report hidden>
+            <summary>Relatório técnico</summary>
+            <pre></pre>
+        </details>
+    </form>
+
+    <div th:replace="~{fragments :: install-notice}"></div>
+
+    <section class="stack" aria-labelledby="files-title">
+        <h2 id="files-title">Arquivos</h2>
+        <ol class="batch-items">
+            <li class="card batch-item" th:each="document : ${documents}" data-batch-item data-state="pending"
+                th:data-id="${document.id}" th:data-format="${document.format}">
+                <span class="batch-item-name" th:text="${document.name}">documento.pdf</span>
+                <span class="batch-item-status" data-item-status>Aguardando</span>
+                <a class="batch-item-link" data-item-link hidden>Ver arquivo assinado</a>
+            </li>
+        </ol>
+    </section>
+</main>
+</body>
+</html>

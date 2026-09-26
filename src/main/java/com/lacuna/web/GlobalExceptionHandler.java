@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.util.HashMap;
@@ -43,6 +44,14 @@ public class GlobalExceptionHandler {
     public ModelAndView uploadTooLarge(HttpServletRequest request) {
         return errorView(HttpStatus.CONTENT_TOO_LARGE, "Arquivo muito grande",
                 "O arquivo excede o tamanho máximo permitido para envio.", backFrom(request));
+    }
+
+    // For instance, more files than the server accepts in a single request.
+    @ExceptionHandler(MultipartException.class)
+    public ModelAndView uploadRefused(MultipartException e, HttpServletRequest request) {
+        log.warn("Upload refused on {}", request.getRequestURI(), e);
+        return errorView(HttpStatus.BAD_REQUEST, "Envio não aceito",
+                "Não foi possível receber os arquivos. Envie menos arquivos por vez.", backFrom(request));
     }
 
     @ExceptionHandler(CertificateRejectedException.class)
@@ -79,6 +88,9 @@ public class GlobalExceptionHandler {
         }
         if (path.startsWith("/validate")) {
             return new Back("/validate", "Validar outro arquivo");
+        }
+        if (path.startsWith("/batch")) {
+            return new Back("/batch", "Enviar outros arquivos");
         }
         return new Back("/", "Voltar ao início");
     }

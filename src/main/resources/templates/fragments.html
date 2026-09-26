@@ -62,12 +62,15 @@
     </div>
 </div>
 
-<!-- Web PKI JavaScript library, see https://docs.lacunasoftware.com/articles/web-pki/get-started -->
-<th:block th:fragment="web-pki-scripts">
+<!--
+    Web PKI JavaScript library, see https://docs.lacunasoftware.com/articles/web-pki/get-started, followed by the page
+    script that uses it.
+-->
+<th:block th:fragment="web-pki-scripts(script)">
     <script src="https://cdn.lacunasoftware.com/libs/web-pki/lacuna-web-pki-2.18.0.min.js"
             integrity="sha256-utM/CTsggW5QWTZgkLcAwVGkMBhYKTz3n0992V4r2y4="
             crossorigin="anonymous"></script>
-    <script th:src="@{/js/signature.js}"></script>
+    <script th:src="@{${script}}"></script>
 </th:block>
 
 </body>

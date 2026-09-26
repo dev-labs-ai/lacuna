@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -60,6 +62,16 @@ class UntrustedCertificateTest {
         assertThat(storageDir.resolve("pkie-transfer")).isEmptyDirectory();
     }
 
+    @Test
+    void refusesCertificateOfBatchBeforeTheUserAuthorizesTheSignatures() throws Exception {
+        checkCertificate(mvc)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Certificado não aceito"))
+                .andExpect(jsonPath("$.detail").value(containsString("autoridade certificadora confiável")))
+                .andExpect(jsonPath("$.report").value(containsString("Lacuna Root Test v3")));
+    }
+
     /**
      * As in the dev profile: PKI Express only checks the certificate on completion.
      */
@@ -84,6 +96,11 @@ class UntrustedCertificateTest {
 
             expectRejection(completion, signPage);
         }
+
+        @Test
+        void leavesTheCertificateOfBatchToBeCheckedOnCompletion() throws Exception {
+            checkCertificate(mvc).andExpect(status().isNoContent());
+        }
     }
 
     private static void expectRejection(ResultActions result, String signPage) throws Exception {
@@ -96,6 +113,12 @@ class UntrustedCertificateTest {
                 .andExpect(model().attribute("backUrl", signPage))
                 .andExpect(model().attribute("backLabel", "Escolher outro certificado"))
                 .andExpect(content().string(containsString("Relatório técnico")));
+    }
+
+    private static ResultActions checkCertificate(MockMvc mvc) throws Exception {
+        return mvc.perform(post("/api/certificates/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"certificate\": \"" + signer.certificateBase64() + "\"}"));
     }
 
     private static String uploadSample(MockMvc mvc) throws Exception {
