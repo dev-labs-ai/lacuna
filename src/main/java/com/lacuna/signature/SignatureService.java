@@ -168,6 +168,8 @@ public class SignatureService {
         // {{name}} is filled from the signer's certificate, see
         // https://docs.lacunasoftware.com/articles/pki-express/pades-tags.html
         var text = new PadesVisualText("Assinado digitalmente por {{name}}", true, 9.0);
+        // .NET format; PKI Express prefixes it with "Data:" and runs in PkiExpressOperators.TIME_ZONE.
+        text.setSigningTimeFormat("dd/MM/yyyy HH:mm:ss '" + PkiExpressOperators.TIME_ZONE + "'");
         var textArea = new PadesVisualRectangle();
         textArea.setHorizontalStretch(0.2, 0.2);
         textArea.setVerticalStretch(0.2, 0.2);

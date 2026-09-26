@@ -15,7 +15,6 @@ import org.springframework.util.StringUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.ZoneId;
 
 /**
  * Creates PKI Express operators configured from {@link LacunaProperties.PkiExpress}. Each operator serves a single
@@ -24,9 +23,14 @@ import java.time.ZoneId;
 @Component
 public class PkiExpressOperators {
 
+    /**
+     * Time zone of the dates PKI Express writes, such as the signing time printed on PDFs: UTC, since a PDF cannot
+     * know where it will be read. Web pages show signing times in the reader's time zone instead.
+     */
+    public static final String TIME_ZONE = "UTC";
+
     private final LacunaProperties.PkiExpress settings;
     private final PkiExpressConfig config;
-    private final ZoneId zone;
 
     public PkiExpressOperators(LacunaProperties properties) throws IOException {
         this.settings = properties.pkiExpress();
@@ -35,7 +39,6 @@ public class PkiExpressOperators {
                 settings.home(),
                 Files.createDirectories(storageDir.resolve("pkie-temp")),
                 Files.createDirectories(storageDir.resolve("pkie-transfer")));
-        this.zone = StringUtils.hasText(settings.timeZone()) ? ZoneId.of(settings.timeZone()) : ZoneId.systemDefault();
     }
 
     public PadesSignatureStarter padesSignatureStarter() {
@@ -74,13 +77,6 @@ public class PkiExpressOperators {
     }
 
     /**
-     * Time zone of the signing times shown to users.
-     */
-    public ZoneId zone() {
-        return zone;
-    }
-
-    /**
      * Runs an operation and disposes of the operator's temporary files, reporting failures as
      * {@link PkiExpressException}.
      */
@@ -102,9 +98,7 @@ public class PkiExpressOperators {
         if (StringUtils.hasText(settings.culture())) {
             operator.setCulture(settings.culture());
         }
-        if (StringUtils.hasText(settings.timeZone())) {
-            operator.setTimeZone(settings.timeZone());
-        }
+        operator.setTimeZone(TIME_ZONE);
         return operator;
     }
 

@@ -88,8 +88,9 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
 - The Web PKI script is loaded from Lacuna's CDN with an SRI hash (`templates/fragments.html`); a version bump needs a
   new hash (`openssl dgst -sha256 -binary lacuna-web-pki-<version>.min.js | base64`).
 - Web PKI promises: `.fail(cb)` replaces the `defaultFail` callback given to `init`.
-- Signing times: pages render them in UTC inside `<time data-local-time>`, which `app.js` rewrites in the reader's
-  time zone.
+- Signing times: PKI Express runs in UTC (`PkiExpressOperators.TIME_ZONE`, also in the PDF stamp format in
+  `SignatureService`), so the stamp prints UTC; pages render them in UTC inside `<time data-local-time>`, which
+  `app.js` rewrites in the reader's time zone.
 - Only PDFs are served inline; any other download is `attachment` + `application/octet-stream` + `nosniff`, because
   uploads can be any file.
 - Batches are capped at 20 files because Tomcat accepts at most 50 multipart parts (`server.tomcat.max-part-count`).

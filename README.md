@@ -112,14 +112,14 @@ para e mostra a mensagem do PKI Express (`docker compose logs app`).
 | `lacuna.pki-express.trusted-roots` | — | Raízes adicionais (`.cer`) |
 | `lacuna.pki-express.pades-policy` | `PadesBasicWithLTV` | Política PAdES (`StandardSignaturePolicies`) |
 | `lacuna.pki-express.cades-policy` | `PkiBrazilCadesAdrBasica` | Política CAdES (ICP-Brasil AD-RB) |
-| `lacuna.pki-express.culture` / `time-zone` | `pt-BR` / `America/Sao_Paulo` | Idioma das mensagens e data do carimbo visual |
+| `lacuna.pki-express.culture` | `pt-BR` | Idioma das mensagens e do carimbo visual |
 | `lacuna.pki-express.offline` | `false` | Não consulta LCR/OCSP |
 | `lacuna.signature.validate-certificate-on-selection` | `true` (`false` no perfil `dev`) | Valida o certificado escolhido antes de pedir a assinatura |
 | `lacuna.web-pki.license` | — | Licença do Web PKI (Base64 ou JSON), necessária fora de `localhost` |
 | `lacuna.storage.dir` | `<java.io.tmpdir>/lacuna` | Documentos e arquivos de trabalho do PKI Express |
 
-As políticas padrão são as mesmas do PKI Express. A página do documento mostra a data da assinatura no fuso do
-navegador.
+As políticas padrão são as mesmas do PKI Express. A data da assinatura sai em UTC no carimbo do PDF, que não tem como
+saber onde será lido, e no fuso do navegador na página do documento.
 
 ## Testes
 

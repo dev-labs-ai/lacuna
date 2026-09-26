@@ -28,7 +28,7 @@ class DocumentStorageTest {
     @BeforeEach
     void setUp() throws Exception {
         storage = new DocumentStorage(new LacunaProperties(
-                new LacunaProperties.PkiExpress(null, false, List.of(), false, null, null, null, null),
+                new LacunaProperties.PkiExpress(null, false, List.of(), false, null, null, null),
                 new LacunaProperties.Signature(true),
                 new LacunaProperties.WebPki(null),
                 new LacunaProperties.Storage(dir)), new JsonMapper());

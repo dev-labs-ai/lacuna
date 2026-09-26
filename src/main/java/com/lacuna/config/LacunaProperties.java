@@ -30,7 +30,6 @@ public record LacunaProperties(
      * @param padesPolicy          policy of PAdES signatures; PKI Express' default is PAdES basic with LTV
      * @param cadesPolicy          policy of CAdES signatures; PKI Express' default is ICP-Brasil AD-RB
      * @param culture              culture for messages and the signing time printed on the visual representation
-     * @param timeZone             IANA time zone for the signing time printed on the visual representation
      */
     public record PkiExpress(
             Path home,
@@ -39,8 +38,7 @@ public record LacunaProperties(
             @DefaultValue("false") boolean offline,
             @DefaultValue("PadesBasicWithLTV") StandardSignaturePolicies padesPolicy,
             @DefaultValue("PkiBrazilCadesAdrBasica") StandardSignaturePolicies cadesPolicy,
-            @DefaultValue("pt-BR") String culture,
-            @DefaultValue("America/Sao_Paulo") String timeZone) {
+            @DefaultValue("pt-BR") String culture) {
     }
 
     /**
