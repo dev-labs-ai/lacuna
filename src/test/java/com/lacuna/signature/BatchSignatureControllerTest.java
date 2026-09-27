@@ -91,7 +91,7 @@ class BatchSignatureControllerTest {
         mvc.perform(get(signPage))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("hasPdf", true))
-                .andExpect(content().string(containsString("/js/batch-signature.js")))
+                .andExpect(content().string(containsString("/js/batch-signature-")))
                 .andExpect(content().string(containsString("name=\"pdfFormat\" value=\"PADES\" checked")))
                 .andExpect(content().string(containsString("data-format=\"PDF\"")))
                 .andExpect(content().string(containsString("data-format=\"OTHER\"")))

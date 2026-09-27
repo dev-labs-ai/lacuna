@@ -107,6 +107,10 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
 - Signing times: PKI Express runs in UTC (`PkiExpressOperators.TIME_ZONE`, also in the PDF stamp format in
   `SignatureService`), so the stamp prints UTC; pages render them in UTC inside `<time data-local-time>`, which
   `app.js` rewrites in the reader's time zone.
+- Static files are served under content-hashed URLs (`/js/app-<md5>.js`, `spring.web.resources.chain.strategy.content`):
+  link them only through `@{...}`, which writes those URLs, and don't assert plain `/js/<name>.js` paths in tests.
+  Without it, browsers ran a cached old `app.js` after a deploy: with no `Cache-Control`, Firefox reuses a file
+  without asking for 10% of its `Last-Modified` age.
 - Only PDFs are served inline; any other download is `attachment` + `application/octet-stream` + `nosniff`, because
   uploads can be any file.
 - Uploads: `spring.servlet.multipart.max-file-size` (150 MB) reaches templates as `@uploadLimits.maxFileSize` (a bean,
