@@ -71,7 +71,9 @@ class ValidationControllerTest {
     void rendersForm() throws Exception {
         mvc.perform(get("/validate"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("name=\"signedFile\"")));
+                .andExpect(content().string(containsString("name=\"signedFile\"")))
+                .andExpect(content().string(containsString("data-max-file-size=\"157286400\"")))
+                .andExpect(content().string(containsString("(.p7s), de até 150 MB.")));
     }
 
     @Test

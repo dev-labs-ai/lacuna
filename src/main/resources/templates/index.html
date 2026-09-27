@@ -21,10 +21,13 @@
             <li><strong>Outros arquivos:</strong> assinados em CAdES, gerando um .p7s que contém o arquivo.</li>
             <li><strong>Assinatura CAdES (.p7s):</strong> recebe mais uma assinatura (coassinatura).</li>
         </ul>
-        <form class="stack" th:action="@{/documents}" method="post" enctype="multipart/form-data" data-busy-on-submit>
+        <form class="stack" th:action="@{/documents}" method="post" enctype="multipart/form-data" data-busy-on-submit
+              th:with="maxFileSize=${@uploadLimits.maxFileSize}">
             <div class="field">
                 <label for="file">Arquivo <span class="required" aria-hidden="true">*</span></label>
-                <input type="file" id="file" name="file" required>
+                <input type="file" id="file" name="file" required aria-describedby="file-hint"
+                       th:data-max-file-size="${maxFileSize.toBytes()}">
+                <p id="file-hint" class="hint" th:text="|Até ${maxFileSize.toMegabytes()} MB.|">Até 150 MB.</p>
             </div>
             <div class="actions">
                 <button type="submit" class="button primary">Enviar e assinar</button>

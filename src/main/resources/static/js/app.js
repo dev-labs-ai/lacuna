@@ -23,6 +23,47 @@ window.addEventListener('pageshow', (event) => {
     }
 });
 
+// File inputs marked with data-max-file-size (bytes) leave out the files larger than that, which the server would
+// refuse along with the whole request, and say which ones; data-max-files caps how many files may remain.
+const megabytes = new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 1});
+const fileNames = new Intl.ListFormat('pt-BR');
+const formatSize = (bytes) => `${megabytes.format(bytes / (1024 * 1024))} MB`;
+for (const input of document.querySelectorAll('input[type="file"][data-max-file-size]')) {
+    const maxSize = Number(input.dataset.maxFileSize);
+    const maxFiles = Number(input.dataset.maxFiles) || Infinity;
+    const leftOut = document.createElement('p');
+    leftOut.id = `${input.id}-left-out`;
+    leftOut.className = 'status';
+    leftOut.dataset.kind = 'warning';
+    leftOut.setAttribute('role', 'status');
+    input.parentElement.append(leftOut);
+    input.setAttribute('aria-describedby', `${input.getAttribute('aria-describedby') ?? ''} ${leftOut.id}`.trim());
+
+    input.addEventListener('change', () => {
+        const kept = new DataTransfer();
+        const tooLarge = [];
+        for (const file of input.files) {
+            if (file.size > maxSize) {
+                tooLarge.push(`${file.name} (${formatSize(file.size)})`);
+            } else {
+                kept.items.add(file);
+            }
+        }
+        if (tooLarge.length > 0) {
+            input.files = kept.files;
+        }
+        const limit = formatSize(maxSize);
+        leftOut.textContent = tooLarge.length === 0 ? ''
+            : tooLarge.length === 1 ? `${tooLarge[0]} não será enviado: passa do limite de ${limit} por arquivo.`
+            : `Não serão enviados, por passarem do limite de ${limit} por arquivo: ${fileNames.format(tooLarge)}.`;
+
+        input.setCustomValidity(input.files.length > maxFiles ? `Selecione no máximo ${maxFiles} arquivos por vez.` : '');
+        if (input.files.length > maxFiles) {
+            input.reportValidity();
+        }
+    });
+}
+
 // Times marked with data-local-time come in UTC; show them in the reader's time zone, e.g. "26/09/2026 12:40:45
 // GMT-04:00", keeping the UTC time as a tooltip.
 const localTime = new Intl.DateTimeFormat('pt-BR', {

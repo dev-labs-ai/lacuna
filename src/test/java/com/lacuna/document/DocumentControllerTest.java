@@ -51,7 +51,9 @@ class DocumentControllerTest {
     void rendersHomePage() throws Exception {
         mvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Enviar e assinar")));
+                .andExpect(content().string(containsString("Enviar e assinar")))
+                .andExpect(content().string(containsString("data-max-file-size=\"157286400\"")))
+                .andExpect(content().string(containsString("Até 150 MB.")));
     }
 
     @Test

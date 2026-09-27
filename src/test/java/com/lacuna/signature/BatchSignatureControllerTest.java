@@ -5,6 +5,7 @@ import com.lacuna.document.StoredDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -48,6 +49,9 @@ class BatchSignatureControllerTest {
     @Autowired
     MockMvc mvc;
 
+    @Autowired
+    MultipartProperties multipart;
+
     @DynamicPropertySource
     static void storage(DynamicPropertyRegistry registry) {
         registry.add("lacuna.storage.dir", storageDir::toString);
@@ -58,7 +62,15 @@ class BatchSignatureControllerTest {
         mvc.perform(get("/batch"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("name=\"files\" multiple")))
-                .andExpect(content().string(containsString("Até 20 arquivos por vez.")));
+                .andExpect(content().string(containsString("data-max-file-size=\"157286400\" data-max-files=\"10\"")))
+                .andExpect(content().string(containsString("Até 10 arquivos por vez, de até 150 MB cada.")));
+    }
+
+    @Test
+    void acceptsAFullBatchOfTheLargestFilesInOneRequest() {
+        var fullBatch = BatchSignatureController.MAX_FILES * multipart.getMaxFileSize().toBytes();
+
+        assertThat(multipart.getMaxRequestSize().toBytes()).isGreaterThan(fullBatch);
     }
 
     @Test
@@ -113,7 +125,7 @@ class BatchSignatureControllerTest {
 
         mvc.perform(upload(files))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("no máximo 20 arquivos")));
+                .andExpect(content().string(containsString("no máximo 10 arquivos")));
     }
 
     @Test

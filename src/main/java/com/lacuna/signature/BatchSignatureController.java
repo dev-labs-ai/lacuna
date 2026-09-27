@@ -27,8 +27,9 @@ import java.util.List;
 @RequestMapping("/batch")
 public class BatchSignatureController {
 
-    // Tomcat accepts at most 50 parts per multipart request by default (server.tomcat.max-part-count).
-    static final int MAX_FILES = 20;
+    // All the files come in one request: spring.servlet.multipart.max-request-size must fit this many files of
+    // max-file-size. Tomcat also refuses more than 50 parts per request by default (server.tomcat.max-part-count).
+    static final int MAX_FILES = 10;
 
     private final DocumentStorage storage;
     private final String webPkiLicense;

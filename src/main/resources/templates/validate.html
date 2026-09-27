@@ -14,17 +14,23 @@
         </p>
     </div>
 
-    <form class="card stack" th:action="@{/validate}" method="post" enctype="multipart/form-data" data-busy-on-submit>
+    <form class="card stack" th:action="@{/validate}" method="post" enctype="multipart/form-data" data-busy-on-submit
+          th:with="maxFileSize=${@uploadLimits.maxFileSize}">
         <div class="field">
             <label for="signedFile">Arquivo assinado <span class="required" aria-hidden="true">*</span></label>
-            <input type="file" id="signedFile" name="signedFile" required aria-describedby="signedFile-hint">
-            <p id="signedFile-hint" class="hint">PDF assinado ou assinatura CAdES (.p7s).</p>
+            <input type="file" id="signedFile" name="signedFile" required aria-describedby="signedFile-hint"
+                   th:data-max-file-size="${maxFileSize.toBytes()}">
+            <p id="signedFile-hint" class="hint"
+               th:text="|PDF assinado ou assinatura CAdES (.p7s), de até ${maxFileSize.toMegabytes()} MB.|">
+                PDF assinado ou assinatura CAdES (.p7s), de até 150 MB.</p>
         </div>
         <div class="field">
             <label for="originalFile">Arquivo original (opcional)</label>
-            <input type="file" id="originalFile" name="originalFile" aria-describedby="originalFile-hint">
+            <input type="file" id="originalFile" name="originalFile" aria-describedby="originalFile-hint"
+                   th:data-max-file-size="${maxFileSize.toBytes()}">
             <p id="originalFile-hint" class="hint">
                 Necessário apenas para assinaturas CAdES destacadas, cujo .p7s não contém o arquivo assinado.
+                <th:block th:text="|Até ${maxFileSize.toMegabytes()} MB.|">Até 150 MB.</th:block>
             </p>
         </div>
         <div class="actions">

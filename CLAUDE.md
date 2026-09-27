@@ -99,7 +99,8 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
 - A CAdES signing time has one-second resolution: the same signer co-signing the same content twice within a second
   produces an identical signature, which PKI Express does not add. Tests that co-sign use `TestSigner.awaitNextSecond()`.
 - Thymeleaf: `th:replace`/`th:insert` are processed before `th:if` on the same element, so put the condition on a
-  wrapping `th:block`. Don't name model attributes `pageTitle`, `pageMain` or `pageScripts`.
+  wrapping `th:block`. Don't name model attributes `pageTitle`, `pageMain` or `pageScripts`. `th:data-*` runs in
+  restricted mode, which refuses bean references (`${@bean...}`): read the bean in a `th:with` on an outer element.
 - The Web PKI script is loaded from Lacuna's CDN with an SRI hash (`templates/fragments.html`); a version bump needs a
   new hash (`openssl dgst -sha256 -binary lacuna-web-pki-<version>.min.js | base64`).
 - Web PKI promises: `.fail(cb)` replaces the `defaultFail` callback given to `init`.
@@ -108,7 +109,11 @@ JavaScript in `static/js`, no build step. `signature.js` drives the single-file 
   `app.js` rewrites in the reader's time zone.
 - Only PDFs are served inline; any other download is `attachment` + `application/octet-stream` + `nosniff`, because
   uploads can be any file.
-- Batches are capped at 20 files because Tomcat accepts at most 50 multipart parts (`server.tomcat.max-part-count`).
+- Uploads: `spring.servlet.multipart.max-file-size` (150 MB) reaches templates as `@uploadLimits.maxFileSize` (a bean,
+  not a model attribute, because views rendered by exception handlers get no `@ModelAttribute`s). File inputs carrying
+  `data-max-file-size` drop larger files in `app.js` before sending, because the server refuses the whole request at
+  the first one. Batches are capped at 10 files (`BatchSignatureController.MAX_FILES`), and `max-request-size` must
+  fit a full batch (a test checks it); Tomcat also refuses more than 50 multipart parts.
 - Docker: the image carries `pkie` but not the license; `docker/entrypoint.sh` activates it on start. The activation
   is bound to the hostname and MAC addresses (the only machine data in `pkie activate <license> --request` codes), so
   `compose.yaml` pins both and keeps `/etc/pkie` in a volume: without that, every re-created container activates

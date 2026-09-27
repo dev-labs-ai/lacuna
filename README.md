@@ -14,7 +14,7 @@ do computador do usuário: o navegador assina com o
 O tipo do arquivo é detectado pelo conteúdo, não pela extensão. O validador (`/validate`) aceita PDFs e `.p7s`,
 inclusive assinaturas CAdES destacadas, que exigem também o arquivo original.
 
-A assinatura em lote (`/batch`) assina até 20 arquivos de uma vez: o usuário escolhe o certificado e autoriza todas
+A assinatura em lote (`/batch`) assina até 10 arquivos de uma vez: o usuário escolhe o certificado e autoriza todas
 as assinaturas uma única vez no Web PKI (`preauthorizeSignatures`), inclusive o PIN de tokens. A página então assina
 cada arquivo pela API JSON (`/api/documents/{id}/signature/start` e `/complete`) e mostra o resultado de cada um; os
 que falharem podem ser reenviados.
@@ -175,6 +175,8 @@ PKI Express trabalha e a apaga em seguida.
 | `lacuna.storage.s3.region` | `us-east-1` | Região S3 |
 | `lacuna.storage.s3.access-key` / `secret-key` | — (cadeia padrão da AWS) | Credenciais S3 |
 | `lacuna.storage.dir` | `<java.io.tmpdir>/lacuna` | Arquivos de trabalho do PKI Express e cópias temporárias dos documentos |
+| `spring.servlet.multipart.max-file-size` | `150MB` | Tamanho máximo de cada arquivo enviado. Os formulários informam o limite e deixam de fora os arquivos maiores |
+| `spring.servlet.multipart.max-request-size` | `1510MB` | Tamanho máximo de um envio, que precisa comportar um lote de 10 arquivos do tamanho máximo |
 
 As políticas padrão são as mesmas do PKI Express. A data da assinatura sai em UTC no carimbo do PDF, que não tem como
 saber onde será lido, e no fuso do navegador na página do documento.
