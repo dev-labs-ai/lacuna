@@ -87,7 +87,8 @@ Packages under `com.lacuna`:
 Front end: Thymeleaf pages wrap the layout fragment `layout :: page(pageTitle, pageMain, pageScripts)`; plain
 JavaScript in `static/js`, no build step. `signature.js` drives the single-file pages (`data-step="start"` or
 `"complete"`); `batch-signature.js` calls `preauthorizeSignatures` once (one PIN for the whole batch), then start,
-`signHash` and complete for each file through the JSON API.
+`signHash` and complete for each file through the JSON API, two files at a time. Each PDF has its own format select
+(`data-item-format`); the `pdfFormat` radios set all the PDFs still to sign, and are left unchecked when they differ.
 
 ## Gotchas
 

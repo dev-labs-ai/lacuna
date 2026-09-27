@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -42,6 +43,8 @@ class BatchSignatureControllerTest {
 
     private static final byte[] PDF = "%PDF-1.4\n".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] TEXT = "texto".getBytes(StandardCharsets.UTF_8);
+    // Start of a CMS SignedData, enough for DocumentFormat to take it for a .p7s.
+    private static final byte[] CMS = HexFormat.of().parseHex("305006092a864886f70d010702a043");
 
     @TempDir
     static Path storageDir;
@@ -85,8 +88,9 @@ class BatchSignatureControllerTest {
     }
 
     @Test
-    void offersPdfFormatsWhenTheBatchHasPdfs() throws Exception {
-        var signPage = uploadBatch(file("contrato.pdf", PDF), file("nota.txt", TEXT));
+    void offersPdfFormatsForAllPdfsAndForEachOne() throws Exception {
+        var signPage = uploadBatch(file("contrato.pdf", PDF), file("anexo.pdf", PDF), file("nota.txt", TEXT),
+                file("assinado.p7s", CMS));
 
         mvc.perform(get(signPage))
                 .andExpect(status().isOk())
@@ -94,8 +98,13 @@ class BatchSignatureControllerTest {
                 .andExpect(content().string(containsString("/js/batch-signature-")))
                 .andExpect(content().string(containsString("name=\"pdfFormat\" value=\"PADES\" checked")))
                 .andExpect(content().string(containsString("data-format=\"PDF\"")))
+                .andExpect(content().string(containsString("aria-label=\"Formato da assinatura de contrato.pdf\"")))
+                .andExpect(content().string(containsString("aria-label=\"Formato da assinatura de anexo.pdf\"")))
+                .andExpect(content().string(containsString("<option value=\"PADES\" selected>PAdES</option>")))
                 .andExpect(content().string(containsString("data-format=\"OTHER\"")))
-                .andExpect(content().string(containsString("Assinar 2 arquivos")));
+                .andExpect(content().string(containsString(">CAdES (.p7s)</span>")))
+                .andExpect(content().string(containsString(">CAdES (coassinatura)</span>")))
+                .andExpect(content().string(containsString("Assinar 4 arquivos")));
     }
 
     @Test
@@ -106,6 +115,7 @@ class BatchSignatureControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("hasPdf", false))
                 .andExpect(content().string(not(containsString("name=\"pdfFormat\""))))
+                .andExpect(content().string(not(containsString("data-item-format"))))
                 .andExpect(content().string(containsString("Assinar 1 arquivo")));
     }
 

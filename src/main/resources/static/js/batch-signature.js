@@ -14,6 +14,7 @@
     const submitButton = form.querySelector('button[type="submit"]');
     const installNotice = document.querySelector('[data-install-notice]');
     const items = [...document.querySelectorAll('[data-batch-item]')];
+    const pdfFormatOptions = form.querySelectorAll('input[name="pdfFormat"]');
     const api = form.dataset.api;
 
     // Without a license the Web PKI only works on localhost.
@@ -62,6 +63,13 @@
         }
         for (const input of form.querySelectorAll('input, select')) {
             input.disabled = busy;
+        }
+        // The format of a signed file can no longer change.
+        for (const item of items) {
+            const format = item.querySelector('[data-item-format]');
+            if (format) {
+                format.disabled = busy || item.dataset.state === 'done';
+            }
         }
     }
 
@@ -117,11 +125,31 @@
         item.querySelector('[data-item-status]').textContent = text;
     }
 
+    // Each PDF has its own choice; any other file is signed in CAdES.
     function signatureFormatOf(item) {
-        if (item.dataset.format !== 'PDF') {
-            return 'CADES';
+        return item.querySelector('[data-item-format]')?.value ?? 'CADES';
+    }
+
+    function pendingPdfFormats() {
+        return pendingItems().map((item) => item.querySelector('[data-item-format]')).filter(Boolean);
+    }
+
+    // The format for all PDFs sets the one of each PDF still to sign.
+    function applyPdfFormat(event) {
+        for (const format of pendingPdfFormats()) {
+            format.value = event.target.value;
         }
-        return form.elements.pdfFormat ? form.elements.pdfFormat.value : 'PADES';
+    }
+
+    // Checks the format shared by the PDFs still to sign, or neither option when they differ.
+    function showPdfFormat() {
+        const chosen = new Set(pendingPdfFormats().map((format) => format.value));
+        if (chosen.size === 0) {
+            return;
+        }
+        for (const option of pdfFormatOptions) {
+            option.checked = chosen.size === 1 && chosen.has(option.value);
+        }
     }
 
     async function signItem(item, thumbprint, certificate) {
@@ -192,8 +220,18 @@
         } finally {
             setBusy(false);
             updateSubmitButton();
+            showPdfFormat();
         }
     }
+
+    for (const option of pdfFormatOptions) {
+        option.addEventListener('change', applyPdfFormat);
+    }
+    for (const format of document.querySelectorAll('[data-item-format]')) {
+        format.addEventListener('change', showPdfFormat);
+    }
+    // Browsers may restore the choices of a reloaded page, each control on its own.
+    showPdfFormat();
 
     form.addEventListener('submit', signPending);
     form.querySelector('[data-action="refresh"]').addEventListener('click', loadCertificates);

@@ -15,9 +15,10 @@ O tipo do arquivo é detectado pelo conteúdo, não pela extensão. O validador 
 inclusive assinaturas CAdES destacadas, que exigem também o arquivo original.
 
 A assinatura em lote (`/batch`) assina até 10 arquivos de uma vez: o usuário escolhe o certificado e autoriza todas
-as assinaturas uma única vez no Web PKI (`preauthorizeSignatures`), inclusive o PIN de tokens. A página então assina
-cada arquivo pela API JSON (`/api/documents/{id}/signature/start` e `/complete`) e mostra o resultado de cada um; os
-que falharem podem ser reenviados.
+as assinaturas uma única vez no Web PKI (`preauthorizeSignatures`), inclusive o PIN de tokens. O formato dos PDFs
+(PAdES ou CAdES) vale para todos, e cada PDF pode ter o seu. A página então assina cada arquivo pela API JSON
+(`/api/documents/{id}/signature/start` e `/complete`), dois de cada vez, e mostra o resultado de cada um; os que
+falharem podem ser reenviados.
 
 ## Pré-requisitos
 

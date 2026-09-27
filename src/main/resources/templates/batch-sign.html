@@ -17,8 +17,11 @@
         each file through the JSON API (see SignatureApiController), reporting the progress in the list below.
     -->
     <form id="batch-form" class="card stack" th:data-api="@{/api}" th:data-web-pki-license="${webPkiLicense}">
-        <fieldset class="field" th:if="${hasPdf}">
+        <fieldset class="field" th:if="${hasPdf}" aria-describedby="pdf-format-hint">
             <legend>Formato da assinatura dos PDFs</legend>
+            <p id="pdf-format-hint" class="hint">
+                Vale para todos os PDFs. Para mudar um deles, escolha o formato ao lado do arquivo, na lista abaixo.
+            </p>
             <label class="choice">
                 <input type="radio" name="pdfFormat" value="PADES" checked>
                 <span><strong>PAdES</strong> — a assinatura fica dentro de cada PDF.</span>
@@ -60,6 +63,13 @@
             <li class="card batch-item" th:each="document : ${documents}" data-batch-item data-state="pending"
                 th:data-id="${document.id}" th:data-format="${document.format}">
                 <span class="batch-item-name" th:text="${document.name}">documento.pdf</span>
+                <select class="batch-item-format" th:if="${document.format.name() == 'PDF'}" data-item-format
+                        th:aria-label="|Formato da assinatura de ${document.name}|">
+                    <option value="PADES" selected>PAdES</option>
+                    <option value="CADES">CAdES (.p7s)</option>
+                </select>
+                <span class="batch-item-format" th:unless="${document.format.name() == 'PDF'}"
+                      th:text="${document.format.name() == 'CMS'} ? 'CAdES (coassinatura)' : 'CAdES (.p7s)'">CAdES (.p7s)</span>
                 <span class="batch-item-status" data-item-status>Aguardando</span>
                 <a class="batch-item-link" data-item-link hidden>Ver arquivo assinado</a>
             </li>
